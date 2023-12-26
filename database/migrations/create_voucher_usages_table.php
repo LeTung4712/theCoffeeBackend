@@ -11,11 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('verification_codes', function (Blueprint $table) {
+        Schema::create('voucher_usages', function (Blueprint $table) {
             $table->id();
-            $table->bigInteger('user_id');
-            $table->string('otp');
-            $table->timestamp('expire_at')->nullable(); 
+            $table->integer('voucher_id');
+            $table->integer('user_id');
             $table->timestamps();
         });
     }
@@ -25,6 +24,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('verification_codes');
+        Schema::dropIfExists('voucher_usages');
     }
 };

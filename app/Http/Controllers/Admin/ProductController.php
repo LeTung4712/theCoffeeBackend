@@ -198,7 +198,7 @@ class ProductController extends Controller
         return true;
     }
     //xóa sản phẩm
-    public function destroy(Request $request)
+    public function delete(Request $request)
     {
         $product = Product::where('id', $request->input('id'))->first();
         if ($product) {

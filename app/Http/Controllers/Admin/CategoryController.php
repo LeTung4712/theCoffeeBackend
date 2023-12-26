@@ -22,11 +22,15 @@ class CategoryController extends Controller
             'parent_id' => (int) $request->input('parent_id'),
             'image_url' => (string) $request->input('image_url')
         ]);
-
+        if ($category) {
+            return response([
+                'message' => 'Thêm danh mục thành công',
+                'category' => $category,
+            ], 200);
+        }
         return response([
-            'message' => 'Thêm danh mục thành công',
-            'category' => $category,
-        ], 200);
+            'message' => 'Thêm danh mục không thành công',
+        ], 500);
     }
     //delete category by id
     public function delete(Request $request)
@@ -50,18 +54,28 @@ class CategoryController extends Controller
     public function index()
     {
         $categories = Category::orderby('id')->get();
+        if ($categories) {
+            return response([
+                'categories' => $categories,
+            ], 200);
+        }
         return response([
-            'Categories' => $categories,
-        ], 200);
+            'message' => 'Không có danh mục',
+        ], 500);
     }
     //get category by parent_id
     public function indexByParentId(Request $request)
     {
         $categories = Category::where('parent_id', $request->parent_id)
             ->orderby('id')->get();
+        if ($categories) {
+            return response([
+                'categories' => $categories,
+            ], 200);
+        }
         return response([
-            'Categories' => $categories,
-        ], 200);
+            'message' => 'Không có danh mục',
+        ], 500);
     }
     //update category by id
     public function update(Request $request) 
@@ -73,27 +87,16 @@ class CategoryController extends Controller
 
         $category->name = (string) $request->input('name');
         $category->save();
-        return response([
-            'message' => 'Cập nhật thành công',
-            'Category' => $category,
-        ], 200);
-    }
-    //delete category
-    public function destroy(Request $request): JsonResponse
-    {
-        $id = (int) $request->input('id');
-        $Category = Category::where('id', $id)->first();
-        if ($Category) {
-            $result = Category::where('id', $id)->orWhere('parent_id', $id)->delete();
-        }
-        if ($result) {
-            return response()->json([
-                'message' => 'Xóa thành công danh mục',
+        if ($category) {
+            return response([
+                'message' => 'Cập nhật thành công',
+                'category' => $category,
             ], 200);
         }
-
-        return response()->json([
-            'message' => 'Xóa thành công không danh mục',
+        return response([
+            'message' => 'Cập nhật không thành công',
         ], 500);
+               
     }
+
 }
