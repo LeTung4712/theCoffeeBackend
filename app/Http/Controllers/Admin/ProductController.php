@@ -18,9 +18,14 @@ class ProductController extends Controller
         $productList = Product::where('active', 1)
             ->orderby('id')
             ->get();
+        if ($productList) {
+            return response([
+                'products' => $productList,
+            ], 200);
+        }
         return response([
-            'products' => $productList,
-        ]);
+            'message' => 'Không có sản phẩm nào',
+        ], 500);
     }
     //them san pham
     public function create(Request $request)
@@ -51,7 +56,11 @@ class ProductController extends Controller
                 'topping_id' => [1,2,3,4,5]
             ]);
         }
-
+        if (!$product) {
+            return response([
+                'message' => 'Thêm sản phẩm thất bại',
+            ], 500);
+        }
         return response([
             'message' => "Thêm sản phẩm thành công",
             'product' => $product,
@@ -130,8 +139,12 @@ class ProductController extends Controller
         )
             ->where('id', $request->product_id) 
             ->where('active', 1)
-            ->first(); // first() là hàm lấy ra bản ghi đầu tiên thỏa mãn điều kiện
-
+            ->first(); 
+        if (!$productInfo) {
+            return response([
+                'message' => 'Không có sản phẩm này trong dữ liệu',
+            ], 500);
+        }
         $sameProductList = Product::select(
             'id',
             'name',
@@ -160,6 +173,11 @@ class ProductController extends Controller
     public function update(Request $request)
     {
         $product = Product::where('id', $request->input('id'))->first();
+        if (!$product) {
+            return response([
+                'message' => 'Không có sản phẩm này trong dữ liệu',
+            ], 500);
+        }
         $isValidPrice = $this->isValidPrice($request);
         if ($isValidPrice === false) {
             return false;
