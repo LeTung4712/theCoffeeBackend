@@ -31,6 +31,7 @@ use Illuminate\Support\Facades\Route;
 | API Routes version 1
 |--------------------------------------------------------------------------
 */
+
 Route::group(['prefix' => 'v1'], function () {
     //admin login
     Route::post('admin/login', [LoginController::class, 'login']); // http://localhost:8000/api/v1/admin/login?username=admin@gmail.com&password=123456
@@ -57,8 +58,8 @@ Route::group(['prefix' => 'v1'], function () {
         //voucher api
         Route::get('voucher/index', [VoucherController::class, 'index']); // http://localhost:8000/api/v1/admin/voucher/index
         Route::post('voucher/create', [VoucherController::class, 'create']); // http://localhost:8000/api/v1/admin/voucher/create?code=abc&image_url=abc&description=abc&discount_type=1&discount_percent=10&max_discount_amount=10000&min_order_amount=10000&expire_at=2021-01-01&total_quantity=100&used_quantity=0&active=1
-        Route::put('voucher/update', [VoucherController::class, 'update']); 
-        Route::delete('voucher/delete', [VoucherController::class, 'delete']);
+        Route::put('voucher/update', [VoucherController::class, 'update']); // http://localhost:8000/api/v1/admin/voucher/update?id=1&code=abc&image_url=abc&description=abc&discount_type=1&discount_percent=10&max_discount_amount=10000&min_order_amount=10000&expire_at=2021-01-01&total_quantity=100&used_quantity=0&active=1
+        Route::delete('voucher/delete', [VoucherController::class, 'delete']); // http://localhost:8000/api/v1/admin/voucher/delete?id=1
 
         //order api
         Route::post('order/addOrder', [OrderController::class, 'addOrder']); // http://localhost:8000/api/v1/admin/order/addOrder?user_id=1&user_name=abc&mobile_no=0828035636&address=abc&note=abc&total_price=10000&payment_method=1&products=[{"product_id":1,"product_count":1,"topping_id":1,"topping_count":1,"size":"M","price":10000}]

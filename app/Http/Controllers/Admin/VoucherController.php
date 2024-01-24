@@ -15,9 +15,15 @@ class VoucherController extends Controller
         $voucherList = Voucher::where('active', 1)
             ->orderby('id')
             ->get();
+        if (!$voucherList) {
+            return response([
+                'message' => 'Không có voucher nào',
+            ], 500);
+        }
         return response([
+            'message' => 'Lấy danh sách voucher thành công',
             'vouchers' => $voucherList,
-        ]);
+        ], 200);
     }
     //them voucher
     public function create(Request $request)
@@ -40,6 +46,11 @@ class VoucherController extends Controller
             'used_quantity' => $request->used_quantity,
             'active' => 1,
         ]);
+        if (!$voucher) {
+            return response([
+                'message' => 'Thêm voucher thất bại',
+            ], 500);
+        }
         return response([
             'message' => "Thêm voucher thành công",
             'voucher' => $voucher,
@@ -58,7 +69,7 @@ class VoucherController extends Controller
             'code' => $request->code,
             'image_url' => $request->image_url,
             'description' => $request->description,
-            'discount_type' => $request->discount_type,
+            'discount_type' => $request->discount_type, //1: percent, 2: amount
             'discount_percent' => $request->discount_percent,
             'max_discount_amount' => $request->max_discount_amount,
             'min_order_amount' => $request->min_order_amount,
@@ -86,7 +97,6 @@ class VoucherController extends Controller
         ]);
         return response([
             'message' => "Xóa voucher thành công",
-            'voucher' => $voucher,
         ], 200);
     }
 }

@@ -18,4 +18,9 @@ class Category extends Model
     {
         return $this->hasMany(Product::class, 'category_id', 'id');
     }
+
+    public function parent() //hàm này để lấy ra category cha của category con
+    {
+        return $this->belongsTo(Category::class, 'parent_id', 'id');
+    }
 }

@@ -15,6 +15,11 @@ class ToppingController extends Controller
     //lay danh sach topping
     public static function index(){
         $toppings = Topping::orderby('id')->get();
+        if(!$toppings){
+            return response([
+                'message' => 'Không có topping nào',
+            ], 500);
+        }
         return response ([
             'Toppings' => $toppings,
         ], 200);
@@ -23,7 +28,7 @@ class ToppingController extends Controller
     public function create(Request $request){
         if (Topping::where('name', $request->name)->first()) { 
             return response([
-                'message' => 'Đã có sản phẩm này',
+                'message' => 'Đã có topping này',
                 'request' => $request ->name,
                 'price' => $request ->price,
 
@@ -33,8 +38,13 @@ class ToppingController extends Controller
             'name' => $request->name,
             'price' => $request->price,
         ]);
+        if(!$topping){
+            return response([
+                'message' => 'Thêm topping thất bại',
+            ], 500);
+        }
         return response([
-            'message' => 'Thêm thành công',
+            'message' => 'Thêm topping thành công',
             'topping' => $topping,
         ], 200);
 
@@ -45,8 +55,13 @@ class ToppingController extends Controller
         $topping->name=$request->name;
         $topping->price = $request->price;
         $topping->save();
+        if(!$topping){
+            return response([
+                'message' => 'Cập nhật topping thất bại',
+            ], 500);
+        }
         return response([
-            'message' => 'Cập nhật thành công',
+            'message' => 'Cập nhật topping thành công',
             'topping' => $topping,
         ], 200);
     }
@@ -54,9 +69,13 @@ class ToppingController extends Controller
     public function delete(Request $request){
         $topping=Topping::find($request->id);
         $topping->delete();
+        if(!$topping){
+            return response([
+                'message' => 'Xóa topping thất bại',
+            ], 500);
+        }
         return response([
             'message' => 'Xóa thành công',
-            'topping' => $topping,
         ], 200);
     }
 }

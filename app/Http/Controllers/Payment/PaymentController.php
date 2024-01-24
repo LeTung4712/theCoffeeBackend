@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Payment;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use App\Models\Order;
 
 class PaymentController extends Controller
 {
@@ -27,8 +28,13 @@ class PaymentController extends Controller
     }   
 
     public function momo_payment(Request $request){
+        $order = Order::find($request->order_id);
+        // if(!$order){
+        //     return response([
+        //         'message' => 'Không tìm thấy đơn hàng',
+        //     ], 500);
+        // }
         $endpoint = "https://test-payment.momo.vn/v2/gateway/api/create"; 
-
 
         $partnerCode = 'MOMOBKUN20180529'; 
         $accessKey = 'klm05TvNBzhg7h7j'; 
@@ -36,8 +42,8 @@ class PaymentController extends Controller
         $orderInfo = "Thanh toán qua MoMo";
         $amount = $request->total_price;
         $orderId = $request->order_id;
-        $redirectUrl = "https://localhost:8080/thanhtoan";
-        $ipnUrl = "https://localhost:8080/thanhtoan";
+        $redirectUrl = "https://localhost:8080/thanhtoan"; //redirectUrl là url đến trang của merchant, khi người dùng click vào nút thanh toán trên app MoMo
+        $ipnUrl = "https://localhost:8080/thanhtoan";      //ipnUrl là url dùng để MoMo gửi kết quả thanh toán về cho merchant
         $extraData = "";
 
         $requestId = time() . "";

@@ -22,6 +22,12 @@ class AuthController extends Controller
                 'mobile_no' => $request->mobile_no,
                 'birth' => DB::raw('CURRENT_TIMESTAMP'),
             ]);
+            if (!$user) {
+                return response([
+                    'error' => true,
+                    'message' => 'Login failed',
+                ], 500);
+            }
         }
 
         $sendOtp = $this->sendSmsNotification($user);         
@@ -33,6 +39,7 @@ class AuthController extends Controller
         ], 200);
         else return response([
             'error' => true,
+            'message' => 'OTP sent failed',
         ], 500);
     }
     //dùng twilio để gửi mã otp

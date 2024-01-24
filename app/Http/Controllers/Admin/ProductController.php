@@ -44,8 +44,10 @@ class ProductController extends Controller
             'active' => 1,
             'image_url' => $request->image_url,
         ]);
-        //tạo topping cho sản phẩm nếu là đồ ăn thì mặc định là topping 6
-        if ($request->category_id == 13||$request->category_id == 14||$request->category_id == 16) {
+        $category = Category::where('id', $request->category_id)->first(); 
+        //tạo topping cho sản phẩm theo danh mục 
+        if ($category->parent_id == 6)
+        {
             $topping = ToppingProduct::create([
                 'product_id' => $product->id,
                 'topping_id' => [6]
@@ -105,9 +107,15 @@ class ProductController extends Controller
                 $productList->push($product);
             }
         }
+        if ($productList->count() == 0) {
+            return response([
+                'message' => 'Không có sản phẩm nào',
+            ], 500);
+        }
         return response([
+            'message' => 'Lấy danh sách sản phẩm thành công',
             'products' => $productList,
-        ]);
+        ], 200);
     }
     //lấy danh sách topping của sản phẩm và info của topping
     public function getToppingInfo($product_id)
