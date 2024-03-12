@@ -43,6 +43,13 @@ class Kernel extends HttpKernel
             \Illuminate\Routing\Middleware\ThrottleRequests::class.':api',
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
         ],
+
+        'admin' => [ //middleware admin 
+            \Illuminate\Routing\Middleware\SubstituteBindings::class, //middleware này sẽ thay thế các tham số trên route bằng các tham số tương ứng trong request
+            \Illuminate\Routing\Middleware\ThrottleRequests::class, //middleware này sẽ giới hạn số lần request tới route
+            
+            
+        ],
     ];
 
     /**

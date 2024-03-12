@@ -12,6 +12,15 @@ use App\Models\Topping;
 
 class ToppingController extends Controller
 {
+    public function __construct()
+    {
+        $this->middleware('auth:admin', ['except' => ['index']]);
+        if (!auth('admin')->check()) { //
+            return response()->json([
+                'message' => 'Unauthorized'
+            ], 401);
+        }
+    }
     //lay danh sach topping
     public static function index(){
         $toppings = Topping::orderby('id')->get();

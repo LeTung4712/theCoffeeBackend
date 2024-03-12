@@ -13,9 +13,9 @@ return [
     |
     */
 
-    'defaults' => [
+    'defaults' => [ //mặc định sẽ sử dụng guard là api 
         'guard' => 'web',
-        'passwords' => 'users',
+        'passwords' => 'users', 
     ],
 
     /*
@@ -40,6 +40,14 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
+        'api' => [
+            'driver' => 'jwt',
+            'provider' => 'admins', //provider là bảng lấy dữ liệu
+        ],
+        'admin' => [
+            'driver' => 'jwt',
+            'provider' => 'admins',
+        ],
     ],
 
     /*
@@ -62,13 +70,13 @@ return [
     'providers' => [
         'users' => [
             'driver' => 'eloquent',
-            'model' => App\Models\User::class,
+            'model' => App\Models\User::class, 
         ],
 
-        // 'users' => [
-        //     'driver' => 'database',
-        //     'table' => 'users',
-        // ],
+        'admins' => [
+            'driver' => 'eloquent',
+            'model' => App\Models\Admin::class, 
+        ],
     ],
 
     /*

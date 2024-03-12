@@ -12,6 +12,15 @@ use Carbon\Carbon;
 
 class OrderController extends Controller
 {
+    public function __construct()
+    {
+        $this->middleware('auth:admin', ['except' => ['addOrder', 'getOrders', 'getOrderInfo']]);
+        if (!auth('admin')->check()) { //
+            return response()->json([
+                'message' => 'Unauthorized'
+            ], 401);
+        }
+    }
     //them don hang
     public function addOrder(Request $request)
     {

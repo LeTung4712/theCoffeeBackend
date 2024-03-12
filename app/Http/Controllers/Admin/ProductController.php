@@ -12,6 +12,15 @@ use Illuminate\Support\Facades\Session;
 
 class ProductController extends Controller
 {
+    public function __construct()
+    {
+        $this->middleware('auth:admin', ['except' => ['index', 'indexByCategoryId', 'getProductInfo']]);
+        if (!auth('admin')->check()) { //
+            return response()->json([
+                'message' => 'Unauthorized'
+            ], 401);
+        }
+    }
     //lay danh sach san pham
     public function index()
     {

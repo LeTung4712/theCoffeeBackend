@@ -9,6 +9,15 @@ use App\Models\VoucherUsage;
 
 class VoucherController extends Controller
 {
+    public function __construct()
+    {
+        $this->middleware('auth:admin', ['except' => ['index']]);
+        if (!auth('admin')->check()) { //
+            return response()->json([
+                'message' => 'Unauthorized'
+            ], 401);
+        }
+    }
     //lay danh sach voucher
     public function index()
     {

@@ -9,6 +9,15 @@ use Illuminate\Http\JsonResponse;
 
 class CategoryController extends Controller
 {
+    public function __construct()
+    {
+        $this->middleware('auth:admin', ['except' => ['index', 'indexByParentId']]); 
+        if (!auth('admin')->check()) { //
+            return response()->json([
+                'message' => 'Unauthorized'
+            ], 401);
+        }
+    }
     //create category
     public function create(Request $request)
     {
@@ -37,6 +46,11 @@ class CategoryController extends Controller
     {
         $id = (int) $request->input('id');
         $category = Category::where('id', $id)->first();
+        if (!$category) {
+            return response()->json([
+                'message' => 'Không có danh mục',
+            ], 404);
+        }
         if ($category) {
             $result = Category::where('id', $id)->orWhere('parent_id', $id)->delete();
         }
@@ -56,31 +70,42 @@ class CategoryController extends Controller
         $categories = Category::orderby('id')->get();
         if ($categories) {
             return response([
+                'message' => 'Lấy danh mục thành công',
                 'categories' => $categories,
             ], 200);
         }
         return response([
             'message' => 'Không có danh mục',
-        ], 500);
+        ], 404);
     }
     //get category by parent_id
     public function indexByParentId(Request $request)
     {
-        $categories = Category::where('parent_id', $request->parent_id)
-            ->orderby('id')->get();
+        $parent_id = (int) $request->input('parent_id');
+        $categories = Category::where('parent_id', $parent_id) ->orderby('id')->get();
+        if (!$categories) {
+            return response([
+                'message' => 'Không có danh mục với parent_id này',
+            ], 404);
+        }    
         if ($categories) {
             return response([
+                'message' => 'Lấy danh mục thành công',
                 'categories' => $categories,
             ], 200);
         }
-        return response([
-            'message' => 'Không có danh mục',
-        ], 500);
+        
+        
     }
     //update category by id
     public function update(Request $request) 
     {
         $category = Category::find($request->id);
+        if (!$category) {
+            return response([
+                'message' => 'Không có danh mục',
+            ], 404);
+        }
         if ($request->input('parent_id') != null && $request->input('parent_id') != $category->id) {
             $category->parent_id = (int) $request->input('parent_id');
         }
