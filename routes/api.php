@@ -13,6 +13,9 @@ use App\Http\Controllers\User\AddressNoteController;
 
 use App\Http\Controllers\Payment\PaymentController;
 
+use App\Http\Controllers\RecommenderSystem\AprioriController;
+use App\Http\Controllers\RecommenderSystem\FP_GrowthController;
+
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -107,5 +110,10 @@ Route::group(['prefix' => 'v1'], function () {
     Route::group(['prefix' => 'payment'], function () {
         Route::post('momo', [PaymentController::class, 'momo_payment']);   // http://localhost:8000/api/v1/payment/momo
     });
+    // api analyze apriori
+    Route::get('analyzeApriori', [AprioriController::class, 'analyzeApriori']); // http://localhost:8000/api/v1/analyzeApriori
+    Route::get('getTransactions', [AprioriController::class, 'getTransactions']); // http://localhost:8000/api/v1/getTransactions
+    //api analyze fp-growth
+    Route::get('analyzeFpGrowth', [FP_GrowthController::class, 'analyzeFpGrowth']); // http://localhost:8000/api/v1/analyzeFpGrowth
 });
 

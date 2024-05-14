@@ -51,7 +51,7 @@ class AuthController extends Controller
         $client = new Client($account_sid, $auth_token);
         $receiverNumber = $user->mobile_no;
         $otp = $this->generate($user); 
-        $message = 'Your OTP to login The Coffee House is: ' . $otp;
+        $message = 'Your OTP to login The Coffee is: ' . $otp;
 
         $result = $client->messages->create($receiverNumber, [
             'from' => $twilio_number,
