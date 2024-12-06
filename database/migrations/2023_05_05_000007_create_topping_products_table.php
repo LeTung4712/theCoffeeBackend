@@ -11,12 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('verification_codes', function (Blueprint $table) {
+        Schema::create('topping_products', function (Blueprint $table) {
             $table->id();
-            $table->bigInteger('user_id');
-            $table->string('otp');
-            $table->timestamp('expire_at')->nullable(); 
+            $table->foreignId('product_id')->constrained()->onDelete('cascade'); // khi sản phẩm bị xóa thì topping sẽ bị xóa
+            $table->json('topping_id')
+                  ->comment('Array of topping ids'); //vd: [1, 2, 3] 
             $table->timestamps();
+            $table->unique(['product_id']);
         });
     }
 
@@ -25,6 +26,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('verification_codes');
+        Schema::dropIfExists('topping_products');
     }
 };

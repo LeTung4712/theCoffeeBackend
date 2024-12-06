@@ -13,7 +13,9 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this -> call(Admins::class);
-        $this -> call(Categories::class);
         $this -> call(Toppings::class);
+        $this -> call(Categories::class);
+        
+        
     }
 }

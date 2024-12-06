@@ -11,11 +11,12 @@ class OrderItem extends Model
     protected $fillable = [
         'order_id',
         'product_id',
-        'product_count',
-        'topping_id',
-        'topping_count',
+        'product_name',
+        'product_price',
+        'product_quantity',
+        'topping_items',
         'size',
-        'price'
+        'item_note'
     ];
 
     protected $casts = [
@@ -24,11 +25,13 @@ class OrderItem extends Model
         'topping_count' => 'array'
     ];
     
-    public function order(){
+    public function order()
+    {   // Một sản phẩm thuộc về một đơn hàng
         return $this->hasOne(Order::class, 'id', 'order_id');
     }
 
-    public function product(){
+    public function product()
+    { 
         return $this->hasOne(Product::class, 'id', 'product_id');
     }
 }

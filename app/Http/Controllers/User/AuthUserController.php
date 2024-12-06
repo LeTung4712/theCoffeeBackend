@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\User\Auth;
+namespace App\Http\Controllers\User;
 
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
@@ -10,7 +10,7 @@ use App\Models\VerificationCode;
 use Twilio\Rest\Client;
 use carbon\Carbon;
 
-class AuthController extends Controller
+class AuthUserController extends Controller
 {
     //đăng nhập
     public function login(Request $request)
@@ -48,6 +48,7 @@ class AuthController extends Controller
         $account_sid = getenv("TWILIO_SID");
         $auth_token = getenv("TWILIO_TOKEN");
         $twilio_number = getenv("TWILIO_FROM");
+        $twilio_service_sid = getenv("TWILIO_SERVICE_SID");
         $client = new Client($account_sid, $auth_token);
         $receiverNumber = $user->mobile_no;
         $otp = $this->generate($user); 
@@ -82,7 +83,7 @@ class AuthController extends Controller
         return VerificationCode::create([
             'user_id' => $user->id,
             'otp' => rand(100000, 999999),  
-            'expire_at' => Carbon::now()->addMinutes(3) // thời gian hết hạn = thời gian hiện tại + 3 phút
+            'expire_at' => Carbon::now()->addMinutes(30) // thời gian hết hạn = thời gian hiện tại + 3 phút
         ]);
     }
     //kiểm tra mã otp

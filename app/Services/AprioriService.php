@@ -44,9 +44,9 @@ class AprioriService
             // Tính toán support cho các tập ứng viên
             $supports = $this->calculateSupports($candidateSets, $transactions);
             //var_dump($supports);
-            //push support vào mảng supports
+            //push support vào mảng supports 
             $this->supports = array_merge($this->supports, $supports);
-
+            //var_dump($this->supports);
             // Loại bỏ các tập ứng viên có support thấp
             $prunedCandidateSets = $this->pruneCandidateSets($supports, $minSupport);
 
@@ -65,6 +65,7 @@ class AprioriService
         }
         //var_dump($this->supports);
         //dd($this-> supports['A,B']);
+        
         ksort($frequentItemSets);
         return $frequentItemSets;
     }
@@ -100,6 +101,7 @@ class AprioriService
         foreach ($candidateSets as $candidateSet) { // Mỗi tập ứng viên
             $support = 0;
             foreach ($transactions as $transaction) { // Mỗi giao dịch
+                //dd($transaction);
                 if ($this->isSubset($candidateSet, $transaction)) { // Nếu tập ứng viên là tập con của giao dịch
                     $support++;
                 }
@@ -118,7 +120,7 @@ class AprioriService
      */
     private function isSubset($candidateSet, $transaction)
     {
-        return count(array_diff($candidateSet, $transaction)) == 0;
+        return count(array_diff($candidateSet, $transaction)) == 0; // Trả về true nếu tập ứng viên là tập con của giao dịch
     }
 
     /**

@@ -13,8 +13,8 @@ return new class extends Migration
     {
         Schema::create('voucher_usages', function (Blueprint $table) {
             $table->id();
-            $table->integer('voucher_id');
-            $table->integer('user_id');
+            $table->foreignId('voucher_id')->constrained()->onDelete('restrict'); // khi voucher bị xóa thì voucher usage vẫn còn   
+            $table->foreignId('user_id')->constrained()->onDelete('cascade'); // khi user bị xóa thì tất cả các voucher usage của user cũng sẽ bị xóa
             $table->timestamps();
         });
     }

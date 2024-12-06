@@ -11,12 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('address_notes', function (Blueprint $table) {
+        Schema::create('admins', function (Blueprint $table) {
             $table->id();
-            $table->integer('user_id');
-            $table->string('user_name');
-            $table->string('address');
-            $table->string('mobile_no');
+            $table->string('username')->unique(); //Tên đăng nhập
+            $table->string('password'); //Mật khẩu
             $table->timestamps();
         });
     }
@@ -26,6 +24,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('address_notes');
+        Schema::dropIfExists('admins');
     }
 };

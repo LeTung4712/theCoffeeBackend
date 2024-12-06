@@ -11,12 +11,15 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('topping_products', function (Blueprint $table) {
+
+        Schema::create('association_rules', function (Blueprint $table) {
             $table->id();
-            $table->json('topping_id');
-            $table->integer('product_id');
+            $table->string('antecedent'); //Tiền đề
+            $table->string('consequent'); //Kết luận
+            $table->decimal('confidence', 5, 4); //Độ tin cậy
             $table->timestamps();
         });
+
     }
 
     /**
@@ -24,6 +27,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('topping_products');
+        Schema::dropIfExists('association_rules');
     }
 };

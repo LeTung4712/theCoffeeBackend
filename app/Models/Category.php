@@ -12,6 +12,7 @@ class Category extends Model
         'name',
         'parent_id',
         'image_url',
+        'active',
         ];
 
     public function products()

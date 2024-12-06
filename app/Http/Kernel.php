@@ -40,15 +40,18 @@ class Kernel extends HttpKernel
 
         'api' => [
             // \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
-            \Illuminate\Routing\Middleware\ThrottleRequests::class.':api',
+            \Illuminate\Routing\Middleware\ThrottleRequests::class . ':api',
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
         ],
 
-        'admin' => [ //middleware admin 
+        'admin' => [ //middleware admin
             \Illuminate\Routing\Middleware\SubstituteBindings::class, //middleware này sẽ thay thế các tham số trên route bằng các tham số tương ứng trong request
             \Illuminate\Routing\Middleware\ThrottleRequests::class, //middleware này sẽ giới hạn số lần request tới route
-            
-            
+        ],
+
+        'user' => [ // middleware cho user
+            \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            \Illuminate\Routing\Middleware\ThrottleRequests::class,
         ],
     ];
 

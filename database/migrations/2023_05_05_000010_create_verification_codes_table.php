@@ -11,10 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('admins', function (Blueprint $table) {
+        Schema::create('verification_codes', function (Blueprint $table) {
             $table->id();
-            $table->string('username')->unique(); //
-            $table->string('password');
+            $table->foreignId('user_id')->constrained()->onDelete('cascade'); // khi user bị xóa thì tất cả các code của user cũng sẽ bị xóa
+            $table->string('otp'); //Mã OTP
+            $table->timestamp('expire_at')->nullable(); //Thời gian hết hạn
             $table->timestamps();
         });
     }
@@ -24,6 +25,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('admins');
+        Schema::dropIfExists('verification_codes');
     }
 };

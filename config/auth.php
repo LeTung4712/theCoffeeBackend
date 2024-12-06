@@ -47,6 +47,11 @@ return [
         'admin' => [
             'driver' => 'jwt',
             'provider' => 'admins',
+            'ttl' => 60, // thời gian hết hạn token là 60 phút
+        ],
+        'user' => [
+            'driver' => 'jwt',
+            'provider' => 'users',
         ],
     ],
 

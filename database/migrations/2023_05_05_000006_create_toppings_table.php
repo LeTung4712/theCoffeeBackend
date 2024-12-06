@@ -12,9 +12,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('toppings', function (Blueprint $table) {
-            $table->id(); 
-            $table->string('name');
-            $table->integer('price');
+            $table->id();
+            $table->string('name', 50)->unique(); 
+            $table->decimal('price', 10, 2);
+            $table->boolean('active')->default(true);
             $table->timestamps();
         });
     }

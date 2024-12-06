@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Payment;
+namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
@@ -21,34 +21,33 @@ class PaymentController extends Controller
         curl_setopt($ch, CURLOPT_TIMEOUT, 5);
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
         //execute post
-        $result = curl_exec($ch);
+        $result = curl_exec($ch); 
         //close connection
         curl_close($ch);
-        return $result;
+        return $result; 
     }   
 
-    public function momo_payment(Request $request){
+    public function momo_payment(Request $request)
+    {
         $order = Order::find($request->order_id);
-        // if(!$order){
-        //     return response([
-        //         'message' => 'Không tìm thấy đơn hàng',
-        //     ], 500);
-        // }
+        if (!$order) {
+            return response()->json(['message' => 'Không tìm thấy đơn hàng'], 404);
+        }
+
         $endpoint = "https://test-payment.momo.vn/v2/gateway/api/create"; 
 
         $partnerCode = 'MOMOBKUN20180529'; 
         $accessKey = 'klm05TvNBzhg7h7j'; 
         $secretKey = 'at67qH6mk8w5Y1nAyMoYKMWACiEi2bsa';
         $orderInfo = "Thanh toán qua MoMo";
-        $amount = $request->total_price;
-        $orderId = $request->order_id;
-        $redirectUrl = "https://localhost:8080/thanhtoan"; //redirectUrl là url đến trang của merchant, khi người dùng click vào nút thanh toán trên app MoMo
-        $ipnUrl = "https://localhost:8080/thanhtoan";      //ipnUrl là url dùng để MoMo gửi kết quả thanh toán về cho merchant
+        $amount = $request->final_price;
+        $orderId = $request->order_code;
+        $redirectUrl = "$request->returnUrl"; //đây là url đến trang của merchant, khi người dùng click vào nút thanh toán trên app MoMo
+        $ipnUrl = "$request->returnUrl"; //đây là url dùng để MoMo gửi kết quả thanh toán về cho merchant
         $extraData = "";
 
         $requestId = time() . "";
         $requestType = "captureWallet";
-        //before sign HMAC SHA256 signature
         $rawHash = "accessKey=" . $accessKey . "&amount=" . $amount . "&extraData=" . $extraData . "&ipnUrl=" . $ipnUrl . "&orderId=" . $orderId . "&orderInfo=" . $orderInfo . "&partnerCode=" . $partnerCode . "&redirectUrl=" . $redirectUrl . "&requestId=" . $requestId . "&requestType=" . $requestType;
         $signature = hash_hmac("sha256", $rawHash, $secretKey);
         $data = array(
@@ -66,11 +65,14 @@ class PaymentController extends Controller
             'requestType' => $requestType,
             'signature' => $signature
         );
-        $result = $this->execPostRequest($endpoint, json_encode($data));
-        $jsonResult = json_decode($result, true);  // decode json
 
-        //Just a example, please check more in there
+        try {
+            $result = $this->execPostRequest($endpoint, json_encode($data));
+            $jsonResult = json_decode($result, true);  // decode json
 
-        return $jsonResult['payUrl'];
+            return response()->json(['payUrl' => $jsonResult['payUrl']], 200);
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Gửi yêu cầu thanh toán thất bại', 'error' => $e->getMessage()], 400);
+        }
     }
 }

@@ -10,6 +10,13 @@ class Topping extends Model
     use HasFactory;
     protected $fillable =[
         'name',
-        'price'
+        'price',
+        'active'
     ];
+
+    public function orderItems()
+    {   // Một topping có thể thuộc nhiều sản phẩm
+        return $this->belongsToMany(OrderItem::class, 'order_item_topping', 'topping_id', 'order_item_id');
+    }
+
 }

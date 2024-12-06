@@ -19,6 +19,7 @@ class Voucher extends Model
         'expire_at',        //ngày hết hạn
         'total_quantity',   //tổng số lượng
         'used_quantity',    //số lượng đã sử dụng
-        'active'
+        'active',           //trạng thái
+        'limit_per_user'    //số lượng mỗi user có thể sử dụng
     ];
 }

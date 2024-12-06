@@ -13,6 +13,11 @@ class AddressNote extends Model
         'user_name',
         'address',
         'mobile_no',
+        'address_type',
+        'is_default',
+        'province_code',
+        'district_code',
+        'ward_code',
     ];
 
     public function user()

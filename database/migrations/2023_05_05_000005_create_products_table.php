@@ -13,13 +13,13 @@ return new class extends Migration
     {
         Schema::create('products', function (Blueprint $table) {
             $table->id();
-            $table->string('name');
-            $table->integer('category_id');
-            $table->text('description');
-            $table->integer('price')->nullable();
-            $table->integer('price_sale')->nullable();
-            $table->integer('active');
-            $table->string('image_url')->nullable();
+            $table->string('name', 100)->unique(); //Tên sản phẩm là duy nhất
+            $table->foreignId('category_id')->constrained();
+            $table->text('description')->nullable(); //Mô tả
+            $table->string('image_url')->nullable(); //Ảnh sản phẩm
+            $table->decimal('price', 10, 2); //Giá
+            $table->decimal('price_sale', 10, 2)->nullable(); //Giá khuyến mãi
+            $table->boolean('active')->default(true); //Trạng thái
             $table->timestamps();
         });
     }

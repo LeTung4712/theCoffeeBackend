@@ -13,13 +13,14 @@ return new class extends Migration
     {
         Schema::create('users', function (Blueprint $table) {
             $table->id();
-            $table->string('first_name')->nullable()->default("");
-            $table->string('last_name')->nullable()->default("");
-            $table->string('gender')->nullable()->default("");
-            $table->date('birth')->nullable();
-            $table->string('mobile_no');
-            $table->string('email')->nullable()->default("");
-            $table->text('address')->nullable()->default("");
+            $table->string('first_name', 50);
+            $table->string('last_name', 50);
+            $table->enum('gender', ['male', 'female', 'other']); //Giới tính
+            $table->date('date_of_birth')->nullable(); //Ngày sinh
+            $table->string('mobile_no', 15); //Số điện thoại
+            $table->string('email', 100); //Email
+            $table->boolean('active')->default(true); //Trạng thái
+            $table->rememberToken(); //Token để lưu trữ thông tin đăng nhập
             $table->timestamps();
         });
     }

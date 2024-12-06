@@ -38,8 +38,6 @@ class FP_GrowthService
         $fpTree = new FPTree($transactions, $this->minSupport, null, 0);
         // Bước 2: Tạo các mẫu kết hợp thường xuyên từ FP-Tree
         $frequentItemsets = $fpTree->minePatterns($this->minSupport);
-        //return $fpTree;
-        //sort theo support
         // sort theo key
         ksort($frequentItemsets);
         return $frequentItemsets;

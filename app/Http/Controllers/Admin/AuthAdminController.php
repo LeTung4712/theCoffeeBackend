@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Admin\Auth;
+namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
@@ -11,11 +11,16 @@ use Illuminate\Support\Facades\DB;
 
 use App\Models\Admin;
 
-class Logincontroller extends Controller
+class AuthAdminController extends Controller
 {
     public function __construct()
     {
         $this->middleware('auth:admin', ['except' => ['login']]); 
+        if (!auth('admin')->check()) { //
+            return response()->json([
+                'message' => 'Unauthorized'
+            ], 401);
+        }
     }
 
     protected function respondWithToken($token)
@@ -24,7 +29,7 @@ class Logincontroller extends Controller
             'error' => false,
             'access_token' => $token,
             'token_type' => 'bearer',
-            'expires_in' => auth('admin')->factory()->getTTL() * 60
+            'expires_in' => auth('admin')->factory()->getTTL() * 60 // thời gian hết hạn token
         ]);
     }
 
@@ -45,28 +50,4 @@ class Logincontroller extends Controller
         auth('admin')->logout();
         return response()->json(['message' => 'Successfully logged out']);
     }
-
-    public function logina(Request $request)
-    {
-        $admin = Admin::where('username', $request->username)->first();
-        if ($admin)
-            if (Hash::check($request->password, $admin->password)) {//check password hash 
-                return response([
-                    'error' => false,
-                    'message' => 'Đăng nhập thành công',
-                    'admin' => $admin
-                ], 200);
-            } else return response([
-                'error' => true,
-                'message' => 'Tài khoản hoặc mật khẩu không đúng',
-            ], 500);
-    }
-    
-        public function logouta()
-        {
-            auth()->logout();
-            return response([
-                'message' => 'Đã đăng xuất'
-            ]);
-        }
 }

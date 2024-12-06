@@ -13,9 +13,10 @@ return new class extends Migration
     {
         Schema::create('categories', function (Blueprint $table) {
             $table->id();
-            $table->string('name', 255);
-            $table->integer('parent_id');
-            $table->string('image_url');
+            $table->string('name', 50)->unique(); //Tên danh mục
+            $table->foreignId('parent_id')->nullable()->constrained('categories'); //Danh mục cha
+            $table->string('image_url')->nullable(); //Ảnh danh mục
+            $table->boolean('active')->default(true); //Trạng thái
             $table->timestamps(); 
         });
     }
