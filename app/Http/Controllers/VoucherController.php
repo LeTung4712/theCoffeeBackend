@@ -11,7 +11,7 @@ class VoucherController extends Controller
     public function __construct()
     {
         $this->middleware('auth:admin', [
-            'except' => ['index', 'indexActive', 'create', 'update', 'delete']
+            'except' => ['index', 'indexActive', 'create', 'update', 'delete'],
         ]);
         if (!auth('admin')->check()) { //
             return response()->json([
@@ -24,18 +24,27 @@ class VoucherController extends Controller
     public function index()
     {
         $voucherList = Voucher::orderby('id')->get();
+        // Chuyển đổi các giá trị số sang dạng số cho từng topping
+        foreach ($voucherList as $voucher) {
+            $voucher->max_discount_amount = (float) $voucher->max_discount_amount;
+            $voucher->min_order_amount = (float) $voucher->min_order_amount;
+        }
         return $voucherList->isNotEmpty()
-            ? response()->json(['message' => 'Lấy danh sách voucher thành công', 'vouchers' => $voucherList], 200)
-            : response()->json(['message' => 'Không có voucher'], 404);
+        ? response()->json(['message' => 'Lấy danh sách voucher thành công', 'vouchers' => $voucherList], 200)
+        : response()->json(['message' => 'Không có voucher'], 404);
     }
 
     //lay voucher đang hoạt động
     public function indexActive()
     {
         $voucherList = Voucher::where('active', true)->orderby('id')->get();
+        foreach ($voucherList as $voucher) {
+            $voucher->max_discount_amount = (float) $voucher->max_discount_amount;
+            $voucher->min_order_amount = (float) $voucher->min_order_amount;
+        }
         return $voucherList->isNotEmpty()
-            ? response()->json(['message' => 'Lấy danh sách voucher thành công', 'vouchers' => $voucherList], 200)
-            : response()->json(['message' => 'Không có voucher'], 404);
+        ? response()->json(['message' => 'Lấy danh sách voucher thành công', 'vouchers' => $voucherList], 200)
+        : response()->json(['message' => 'Không có voucher'], 404);
     }
 
     //them voucher

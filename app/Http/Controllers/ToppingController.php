@@ -25,6 +25,10 @@ class ToppingController extends Controller
     //lay danh sach topping
     public static function index(){
         $toppings = Topping::orderby('id')->get();
+        // Chuyển đổi các giá trị số sang dạng số cho từng topping
+        foreach ($toppings as $topping) {
+            $topping->price = (float) $topping->price;
+        }
         return $toppings->isNotEmpty()
             ? response()->json(['message' => 'Lấy danh sách topping thành công', 'toppings' => $toppings], 200)
             : response()->json(['message' => 'Không có topping'], 404);

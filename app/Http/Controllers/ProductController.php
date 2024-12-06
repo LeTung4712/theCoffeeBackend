@@ -55,7 +55,7 @@ class ProductController extends Controller
                 ToppingProduct::insert($toppings);
             }
 
-            return response()->json(['message' => 'Thêm sản phẩm thành công', 'product' => $product], 200);
+            return response()->json(['message' => 'Thêm sản phẩm thành công'], 200);
         } catch (\Exception $e) {
             return response()->json(['message' => 'Thêm sản phẩm thất bại', 'error' => $e->getMessage()], 400);
         }
@@ -82,6 +82,13 @@ class ProductController extends Controller
             ->orderby('id')
             ->get();
 
+        // Chuyển đổi các giá trị số sang dạng số cho từng sản phẩm
+        foreach ($productList as $product) {
+            $product->price = (float) $product->price;
+            $product->price_sale = (float) $product->price_sale;
+        }
+        
+
         return $productList->isNotEmpty()
             ? response(['message' => 'Lấy danh sách sản phẩm thành công', 'products' => $productList], 200)
             : response(['message' => 'Không có sản phẩm nào'], 404);
@@ -96,28 +103,29 @@ class ProductController extends Controller
             ->where('active', true)
             ->first();
 
+        // Kiểm tra xem sản phẩm có tồn tại không
         if (!$productInfo) {
             return response(['message' => 'Không có sản phẩm này trong dữ liệu'], 404);
         }
+
+        // Chuyển đổi các giá trị số sang dạng số
+        $productInfo->price = (float) $productInfo->price;
+        $productInfo->price_sale = (float) $productInfo->price_sale;
 
         $sameProductList = Product::where('category_id', $productInfo->category_id)
             ->where('active', true)
             ->where('id', '<>', $productInfo->id) // Loại bỏ sản phẩm hiện tại
             ->get();
 
+        // Chuyển đổi các giá trị số sang dạng số cho từng sản phẩm
+        foreach ($sameProductList as $product) {
+            $product->price = (float) $product->price;
+            $product->price_sale = (float) $product->price_sale;
+        }
+        
         return response([
             'message' => 'Lấy thông tin sản phẩm thành công',
-            'product' => [
-                'id' => $productInfo->id,
-                'name' => $productInfo->name,
-                'category_id' => $productInfo->category_id,
-                'description' => $productInfo->description,
-                'price' => $productInfo->price,
-                'price_sale' => $productInfo->price_sale,
-                'active' => $productInfo->active,
-                'image_url' => $productInfo->image_url,
-                'toppings' => $productInfo->toppings(),
-            ],
+            'product' => $productInfo,
             'same_products' => $sameProductList,
         ], 200);
     }

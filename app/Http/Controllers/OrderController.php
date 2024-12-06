@@ -154,12 +154,18 @@ class OrderController extends Controller
             foreach ($order->orderItems as $item) {
                 $item->topping_items = json_decode($item->topping_items, true);
             }
+
+            // Chuyển đổi các giá trị số sang dạng số
+            $order->total_price = (float) $order->total_price;
+            $order->discount_amount = (float) $order->discount_amount;
+            $order->shipping_fee = (float) $order->shipping_fee;
+            $order->final_price = (float) $order->final_price;
+            // Thêm các trường khác nếu cần
         }
 
-        return $orders-> isEmpty() 
+        return $orders->isEmpty() 
             ? response()->json(['message' => 'Không có lịch sử đơn hàng'], 404)
             : response()->json(['message' => 'Lấy lịch sử đơn hàng thành công', 'orders' => $orders], 200);
-
     }
 
     //lay thong tin don hang theo id

@@ -101,12 +101,13 @@ Route::group(['prefix' => 'v1'], function () {
         //auth api
         Route::post('auth/login', [AuthUserController::class, 'login']); // http://localhost:8000/api/v1/user/auth/login?mobile_no=0828035636
         Route::post('auth/checkOtp', [AuthUserController::class, 'checkOtp']); // http://localhost:8000/api/v1/user/auth/checkOtp?mobile_no=0828035636&otp=123456
+        //info api
         Route::put('info/updateInfo', [UserController::class, 'updateInfo']); // http://localhost:8000/api/v1/user/info/updateInfo?id=1&last_name=abc&first_name=abc&gender=nam&birth=1999-01-01&mobile_no=0828035636&email=abc&address=abc
-        Route::post('info/getAddressNote', [AddressNoteController::class, 'getAddressNote']); // http://localhost:8000/api/v1/user/info/getAddressNote?id=1
+        Route::get('info/getAddressNote', [AddressNoteController::class, 'getAddressNote']); // http://localhost:8000/api/v1/user/info/getAddressNote?id=1
         Route::post('info/createAddressNote', [AddressNoteController::class, 'createAddressNote']);
         Route::put('info/updateAddressNote', [AddressNoteController::class, 'updateAddressNote']);
         Route::delete('info/deleteAddressNote', [AddressNoteController::class, 'deleteAddressNote']);
-        Route::post('info/getOrderHistory', [OrderController::class, 'getOrderHistory']); // http://localhost:8000/api/v1/user/order/getOrders?user_id=1
+        Route::get('info/getOrderHistory', [OrderController::class, 'getOrderHistory']); // http://localhost:8000/api/v1/user/order/getOrders?user_id=1
     });
 
     //api thanh toán
