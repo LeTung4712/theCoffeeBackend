@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\Product;
-use App\Models\Topping;
 use App\Models\ToppingProduct;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Session;
@@ -15,7 +14,7 @@ class ProductController extends Controller
     public function __construct()
     {
         $this->middleware('auth:admin', [
-            'except' => ['index', 'indexByCategoryId', 'getProductInfo', 'update', 'create', 'delete']
+            'except' => ['index', 'indexByCategoryId', 'getProductInfo', 'update', 'create', 'delete'],
         ]);
         if (!auth('admin')->check()) { //
             return response()->json([
@@ -30,8 +29,8 @@ class ProductController extends Controller
         $productList = Product::orderby('id')->get();
 
         return $productList->isNotEmpty()
-            ? response(['products' => $productList], 200)
-            : response(['message' => 'Không có sản phẩm nào'], 404);
+        ? response(['products' => $productList], 200)
+        : response(['message' => 'Không có sản phẩm nào'], 404);
     }
 
     //thêm sản phẩm
@@ -49,13 +48,14 @@ class ProductController extends Controller
             $product = Product::create($productData);
 
             if ($request->has('toppings')) {
-                $toppings = array_map(function ($toppingId) use ($product) {
-                    return ['product_id' => $product->id, 'topping_id' => $toppingId];
-                }, $request->toppings);
-                ToppingProduct::insert($toppings);
+                // Lưu topping 
+                ToppingProduct::create([
+                    'product_id' => $product->id,
+                    'topping_id' => $request->toppings
+                ]);
             }
 
-            return response()->json(['message' => 'Thêm sản phẩm thành công'], 200);
+            return response()->json(['message' => 'Thêm sản phẩm thành công'], 201);
         } catch (\Exception $e) {
             return response()->json(['message' => 'Thêm sản phẩm thất bại', 'error' => $e->getMessage()], 400);
         }
@@ -68,7 +68,7 @@ class ProductController extends Controller
     }
 
     //lấy danh sách sản phẩm theo category_id
-    //ý tưởng: lấy danh sách category theo category_id, 
+    //ý tưởng: lấy danh sách category theo category_id,
     //sau đó lấy tất cả category con của category đó, sau đó lấy tất cả product theo category_id
     public function indexByCategoryId(Request $request)
     {
@@ -87,19 +87,16 @@ class ProductController extends Controller
             $product->price = (float) $product->price;
             $product->price_sale = (float) $product->price_sale;
         }
-        
 
         return $productList->isNotEmpty()
-            ? response(['message' => 'Lấy danh sách sản phẩm thành công', 'products' => $productList], 200)
-            : response(['message' => 'Không có sản phẩm nào'], 404);
+        ? response(['message' => 'Lấy danh sách sản phẩm thành công', 'products' => $productList], 200)
+        : response(['message' => 'Không có sản phẩm nào'], 404);
     }
-
 
     //lấy thông tin sản phẩm
     public function getProductInfo(Request $request)
     {
-        $productInfo = Product::with('toppingProducts')
-            ->where('id', $request->product_id)
+        $productInfo = Product::where('id', $request->product_id)
             ->where('active', true)
             ->first();
 
@@ -111,6 +108,9 @@ class ProductController extends Controller
         // Chuyển đổi các giá trị số sang dạng số
         $productInfo->price = (float) $productInfo->price;
         $productInfo->price_sale = (float) $productInfo->price_sale;
+        $productInfo->toppings = $productInfo->toppings();
+        //không cho topping_products xuất hiện trong response
+        $productInfo->makeHidden('toppingProducts');
 
         $sameProductList = Product::where('category_id', $productInfo->category_id)
             ->where('active', true)
@@ -122,7 +122,7 @@ class ProductController extends Controller
             $product->price = (float) $product->price;
             $product->price_sale = (float) $product->price_sale;
         }
-        
+
         return response([
             'message' => 'Lấy thông tin sản phẩm thành công',
             'product' => $productInfo,

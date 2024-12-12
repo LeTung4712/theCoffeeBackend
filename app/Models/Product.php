@@ -33,11 +33,14 @@ class Product extends Model
     {
         $toppingProducts = $this->toppingProducts; // Lấy tất cả topping_product liên quan
         $toppingIds = [];
-
+        
         foreach ($toppingProducts as $toppingProduct) {
             $toppingIds = array_merge($toppingIds, $toppingProduct->topping_id); // Gộp tất cả topping_id vào mảng
         }
-
-        return Topping::whereIn('id', $toppingIds)->where('active', 1)->get(); // Lấy topping từ bảng Topping
+        $toppingList = Topping::whereIn('id', $toppingIds)->get(); // Lấy tất cả topping có id trong mảng toppingIds
+        foreach ($toppingList as $topping) {
+            $topping->price = (float) $topping->price; // Chuyển đổi giá thành số
+        }
+        return $toppingList; 
     }
 }

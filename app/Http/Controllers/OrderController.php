@@ -87,7 +87,7 @@ class OrderController extends Controller
         try {
             $order->status = '1';
             $order->save();
-            return response()->json(['message' => 'Cập nhật trạng thái đơn hàng thành công', 'order' => $order], 200);
+            return response()->json(['message' => 'Cập nhật trạng thái đơn hàng thành công'], 200);
         } catch (\Exception $e) {
             return response()->json(['message' => 'Cập nhật trạng thái đơn hàng thất bại', 'error' => $e->getMessage()], 400);
         }
@@ -103,7 +103,7 @@ class OrderController extends Controller
         try {
             $order->status = '2';
             $order->save();
-            return response()->json(['message' => 'Cập nhật trạng thái đơn hàng thành công', 'order' => $order], 200);
+            return response()->json(['message' => 'Cập nhật trạng thái đơn hàng thành công'], 200);
         } catch (\Exception $e) {
             return response()->json(['message' => 'Cập nhật trạng thái đơn hàng thất bại', 'error' => $e->getMessage()], 400);
         }
@@ -119,7 +119,7 @@ class OrderController extends Controller
         try {
             $order->status = '3';
             $order->save();
-            return response()->json(['message' => 'Cập nhật trạng thái đơn hàng thành công', 'order' => $order], 200);
+            return response()->json(['message' => 'Cập nhật trạng thái đơn hàng thành công'], 200);
         } catch (\Exception $e) {
             return response()->json(['message' => 'Cập nhật trạng thái đơn hàng thất bại', 'error' => $e->getMessage()], 400);
         }
@@ -135,7 +135,7 @@ class OrderController extends Controller
         try {
             $order->status = '-1';
             $order->save();
-            return response()->json(['message' => 'Cập nhật trạng thái đơn hàng thành công', 'order' => $order], 200);
+            return response()->json(['message' => 'Cập nhật trạng thái đơn hàng thành công'], 200);
         } catch (\Exception $e) {
             return response()->json(['message' => 'Cập nhật trạng thái đơn hàng thất bại', 'error' => $e->getMessage()], 400);
         }
@@ -150,7 +150,7 @@ class OrderController extends Controller
             ->get();
 
         foreach ($orders as $order) {
-            // Chuyển đổi topping_details từ chuỗi JSON thành mảng
+            // Chuyển đổi topping_items từ chuỗi JSON thành mảng
             foreach ($order->orderItems as $item) {
                 $item->topping_items = json_decode($item->topping_items, true);
             }
@@ -160,30 +160,35 @@ class OrderController extends Controller
             $order->discount_amount = (float) $order->discount_amount;
             $order->shipping_fee = (float) $order->shipping_fee;
             $order->final_price = (float) $order->final_price;
-            // Thêm các trường khác nếu cần
         }
 
-        return $orders->isEmpty() 
-            ? response()->json(['message' => 'Không có lịch sử đơn hàng'], 404)
-            : response()->json(['message' => 'Lấy lịch sử đơn hàng thành công', 'orders' => $orders], 200);
+        return $orders->isEmpty()
+        ? response()->json(['message' => 'Không có lịch sử đơn hàng'], 404)
+        : response()->json(['message' => 'Lấy lịch sử đơn hàng thành công', 'orders' => $orders], 200);
     }
 
     //lay thong tin don hang theo id
     public function getOrderInfo(Request $request)
     {
-        $order = Order::where('id', $request->order_id)->with('orderItems')->first();
+        $order = Order::where('order_code', $request->order_code)->with('orderItems')->first();
         if (!$order) {
             return response()->json(['message' => 'Không tìm thấy đơn hàng'], 404);
         }
 
-        // Chuyển đổi topping_details từ chuỗi JSON thành mảng
+        // Chuyển đổi topping_items từ chuỗi JSON thành mảng
         foreach ($order->orderItems as $item) {
-            $item->topping_details = json_decode($item->topping_details, true);
+            $item->product_price = (float) $item->product_price;
+            $item->topping_items = $item->topping_items ? json_decode($item->topping_items, true) : [];
         }
+        // Chuyển đổi các giá trị số sang dạng số
+        $order->total_price = (float) $order->total_price;
+        $order->discount_amount = (float) $order->discount_amount;
+        $order->shipping_fee = (float) $order->shipping_fee;
+        $order->final_price = (float) $order->final_price;
 
-        return $order 
-            ? response()->json(['message' => 'Lấy thông tin đơn hàng thành công', 'order' => $order], 200)
-            : response()->json(['message' => 'Không tìm thấy đơn hàng'], 404);
+        return $order
+        ? response()->json(['message' => 'Lấy thông tin đơn hàng thành công', 'order' => $order], 200)
+        : response()->json(['message' => 'Không tìm thấy đơn hàng'], 404);
     }
 
     //lay don hang thanh cong
@@ -195,36 +200,48 @@ class OrderController extends Controller
             ->get();
 
         foreach ($orders as $order) {
-            // Chuyển đổi topping_details từ chuỗi JSON thành mảng
+            // Chuyển đổi topping_items từ chuỗi JSON thành mảng
             foreach ($order->orderItems as $item) {
-                $item->topping_details = json_decode($item->topping_details, true);
+                $item->product_price = (float) $item->product_price;
+                $item->topping_items = json_decode($item->topping_items, true);
             }
+            // Chuyển đổi các giá trị số sang dạng số
+            $order->total_price = (float) $order->total_price;
+            $order->discount_amount = (float) $order->discount_amount;
+            $order->shipping_fee = (float) $order->shipping_fee;
+            $order->final_price = (float) $order->final_price;
         }
-        return $orders->isEmpty() 
-            ? response()->json(['message' => 'Không tìm thấy đơn hàng'], 404)
-            : response()->json(['message' => 'Lấy thông tin đơn hàng thành công', 'orders' => $orders], 200);
+        return $orders->isEmpty()
+        ? response()->json(['message' => 'Không tìm thấy đơn hàng'], 404)
+        : response()->json(['message' => 'Lấy thông tin đơn hàng thành công', 'orders' => $orders], 200);
     }
 
     //lay don hang chua thanh cong
     public function getUnsuccessOrders()
     {
-        //lấy tất cả đơn hàng có trạng thái khác 3 (đã giao thành công) và khác -1 (đã hủy)
-        $orders = Order::where('status', '!=', '3')
-            ->where('status', '!=', '-1')
+        //lấy tất cả đơn hàng có trạng thái 0 (chờ xác nhận) và 1 (đã thanh toán chờ xác nhận)
+        $orders = Order::where('status', '=', '0')
+            ->orWhere('status', '=', '1')
             ->orderby('id')
             ->with('orderItems') // dùng eager loading để lấy thông tin chi tiết của đơn hàng
             ->get();
-            
+
         foreach ($orders as $order) {
-            // Chuyển đổi topping_details từ chuỗi JSON thành mảng
+            // Chuyển đổi topping_items từ chuỗi JSON thành mảng
             foreach ($order->orderItems as $item) {
-                $item->topping_details = json_decode($item->topping_details, true);
+                $item->product_price = (float) $item->product_price;
+                $item->topping_items = json_decode($item->topping_items, true);
             }
+            // Chuyển đổi các giá trị số sang dạng số
+            $order->total_price = (float) $order->total_price;
+            $order->discount_amount = (float) $order->discount_amount;
+            $order->shipping_fee = (float) $order->shipping_fee;
+            $order->final_price = (float) $order->final_price;
         }
 
-        return $orders->isEmpty() 
-            ? response()->json(['message' => 'Không tìm thấy đơn hàng'], 404)
-            : response()->json(['message' => 'Lấy thông tin đơn hàng thành công', 'orders' => $orders], 200);
+        return $orders->isEmpty()
+        ? response()->json(['message' => 'Không tìm thấy đơn hàng'], 404)
+        : response()->json(['message' => 'Lấy thông tin đơn hàng thành công', 'orders' => $orders], 200);
     }
 
 }

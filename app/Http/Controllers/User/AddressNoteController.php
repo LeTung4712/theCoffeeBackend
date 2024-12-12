@@ -22,7 +22,7 @@ class AddressNoteController extends Controller
     public function createAddressNote(Request $request){
         // Giới hạn số lượng ghi chú địa chỉ của user là 4
         if (AddressNote::where('user_id', $request->user_id)->count() >= 4) {
-            return response()->json(['message' => 'Số lượng ghi chú địa chỉ của bạn đã đạt giới hạn'], 400);
+            return response()->json(['message' => 'Số lượng ghi chú địa chỉ của bạn đã đạt giới hạn là 4'], 400);
         }
 
         $addressNote = new AddressNote($request->only([
@@ -39,7 +39,7 @@ class AddressNoteController extends Controller
                     ->update(['is_default' => 0]);
             }
 
-            return response()->json(['message' => 'Thêm ghi chú địa chỉ thành công', 'address_note' => $addressNote], 200);
+            return response()->json(['message' => 'Thêm ghi chú địa chỉ thành công', 'address_note' => $addressNote], 201);
         } catch (\Exception $e) {
             return response()->json(['message' => 'Thêm ghi chú địa chỉ không thành công', 'error' => $e->getMessage()], 400);
         }

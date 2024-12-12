@@ -26,6 +26,7 @@ class VoucherController extends Controller
         $voucherList = Voucher::orderby('id')->get();
         // Chuyển đổi các giá trị số sang dạng số cho từng topping
         foreach ($voucherList as $voucher) {
+            $voucher->discount_percent = (float) $voucher->discount_percent;
             $voucher->max_discount_amount = (float) $voucher->max_discount_amount;
             $voucher->min_order_amount = (float) $voucher->min_order_amount;
         }
@@ -39,6 +40,7 @@ class VoucherController extends Controller
     {
         $voucherList = Voucher::where('active', true)->orderby('id')->get();
         foreach ($voucherList as $voucher) {
+            $voucher->discount_percent = (float) $voucher->discount_percent;
             $voucher->max_discount_amount = (float) $voucher->max_discount_amount;
             $voucher->min_order_amount = (float) $voucher->min_order_amount;
         }
@@ -70,7 +72,7 @@ class VoucherController extends Controller
                 'limit_per_user' => (int) $request->limit_per_user,
                 'active' => (bool) true,
             ]);
-            return response()->json(['message' => 'Thêm voucher thành công', 'voucher' => $voucher], 200);
+            return response()->json(['message' => 'Thêm voucher thành công', 'voucher' => $voucher], 201);
         } catch (\Exception $e) {
             return response()->json(['message' => 'Thêm voucher thất bại', 'error' => $e->getMessage()], 400);
         }
