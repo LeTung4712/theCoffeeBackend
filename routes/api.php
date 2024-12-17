@@ -58,6 +58,7 @@ Route::group(['prefix' => 'v1'], function () {
         //topping api
         Route::group(['prefix' => 'topping'], function () {
             Route::get('index', [ToppingController::class, 'index']); // http://localhost:8000/api/v1/admin/topping/index
+            Route::get('indexActive', [ToppingController::class, 'getActiveToppings']); // http://localhost:8000/api/v1/admin/topping/indexActive
             Route::post('create', [ToppingController::class, 'create']); // http://localhost:8000/api/v1/admin/topping/create?name=abc&price=10000&description=abc&image_url=abc&active=1
             Route::put('update', [ToppingController::class, 'update']); // http://localhost:8000/api/v1/admin/topping/update?id=1&name=abc&price=10000&description=abc&image_url=abc&active=1
             Route::delete('delete', [ToppingController::class, 'delete']); // http://localhost:8000/api/v1/admin/topping/delete?id=1
@@ -80,6 +81,8 @@ Route::group(['prefix' => 'v1'], function () {
             Route::get('getOrderInfo', [OrderController::class, 'getOrderInfo']); // http://
             Route::get('getSuccessOrders', [OrderController::class, 'getSuccessOrders']); // http://localhost:8000/api/v1/admin/order/getSuccessOrder
             Route::get('getUnsuccessOrders', [OrderController::class, 'getUnsuccessOrders']); // http://localhost:8000/api/v1/admin/order/getUnsuccessOrder
+            Route::get('getDeliveryOrders', [OrderController::class, 'getDeliveryOrders']); // http://localhost:8000/api/v1/admin/order/getDeliveryOrders
+            Route::get('analytics', [OrderController::class, 'getAnalyzeOrders']); // http://localhost:8000/api/v1/admin/order/analytics?timeRange=week
         });
 
         //api cho recommender system
@@ -91,8 +94,8 @@ Route::group(['prefix' => 'v1'], function () {
             Route::post('analyzeFpGrowth', [FP_GrowthController::class, 'analyzeFpGrowth']); // http://localhost:8000/api/v1/recommenderSystem/analyzeFpGrowth
            
             //api recommendation
-            Route::get('getAssociationRules', [RecommendationController::class, 'getAssociationRules']); // http://localhost:8000/api/v1/recommenderSystem/getAssociationRules
-            Route::post('recommendation', [RecommendationController::class, 'getRecommendations']); // http://localhost:8000/api/v1/recommenderSystem/recommendation?cartItems=[1,2,3]
+            Route::get('associationRules', [RecommendationController::class, 'getAssociationRules']); // http://localhost:8000/api/v1/recommenderSystem/associationRules
+            Route::get('recommendation', [RecommendationController::class, 'getRecommendations']); // http://localhost:8000/api/v1/recommenderSystem/recommendation?cartItems=[1,2,3]
         });
     });
 

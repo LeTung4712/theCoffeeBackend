@@ -14,7 +14,7 @@ class ToppingController extends Controller
 {
     public function __construct()
     {
-        $this->middleware('auth:admin', ['except' => ['index', 'create', 'update', 'delete']]);
+        $this->middleware('auth:admin', ['except' => ['index', 'getActiveToppings', 'create', 'update', 'delete']]);
         if (!auth('admin')->check()) { //
             return response()->json([
                 'message' => 'Unauthorized'
@@ -34,6 +34,14 @@ class ToppingController extends Controller
             : response()->json(['message' => 'Không có topping'], 404);
     }
 
+    //lay danh sach topping active
+    public static function getActiveToppings(){
+        $toppings = Topping::where('active', true)->get();
+        return $toppings->isNotEmpty()
+            ? response()->json(['message' => 'Lấy danh sách topping thành công', 'toppings' => $toppings], 200)
+            : response()->json(['message' => 'Không có topping'], 404);
+    }
+
     //them topping
     public function create(Request $request){
         $existingTopping = Topping::where('name', $request->name)->first();
@@ -44,7 +52,7 @@ class ToppingController extends Controller
         try {
             $topping = Topping::create([
                 'name' => (string) $request->name,
-                'price' => (float) $request->price,
+                'price' => (float) $request->price ?? 0,
                 'active' => (bool) true
             ]);
             return response()->json(['message' => 'Thêm topping thành công', 'topping' => $topping], 200);
@@ -62,7 +70,7 @@ class ToppingController extends Controller
 
         try {
             $topping->name = (string) $request->name;
-            $topping->price = (float) $request->price;
+            $topping->price = (float) $request->price ?? 0;
             $topping->active = (bool) $request->active;
             $topping->save();
             return response()->json(['message' => 'Cập nhật topping thành công', 'topping' => $topping], 200);
