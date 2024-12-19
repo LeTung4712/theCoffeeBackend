@@ -90,10 +90,10 @@ Route::group(['prefix' => 'v1'], function () {
         Route::group(['prefix' => 'recommenderSystem'], function () {
             // api analyze apriori
             Route::post('analyzeApriori', [AprioriController::class, 'analyzeApriori']); // http://localhost:8000/api/v1/recommenderSystem/analyzeApriori
-            Route::get('getTransactions', [AprioriController::class, 'getTransactions']); // http://localhost:8000/api/v1/recommenderSystem/getTransactions
             //api analyze fp-growth
             Route::post('analyzeFpGrowth', [FP_GrowthController::class, 'analyzeFpGrowth']); // http://localhost:8000/api/v1/recommenderSystem/analyzeFpGrowth
-           
+            //api analyze shopping behavior
+            Route::post('analyzeShoppingBehavior', [RecommendationController::class, 'getAnalyzeShoppingBehavior']); // http://localhost:8000/api/v1/recommenderSystem/analyzeShoppingBehavior
             //api recommendation
             Route::get('associationRules', [RecommendationController::class, 'getAssociationRules']); // http://localhost:8000/api/v1/recommenderSystem/associationRules
             Route::get('recommendation', [RecommendationController::class, 'getRecommendations']); // http://localhost:8000/api/v1/recommenderSystem/recommendation?cartItems=[1,2,3]
