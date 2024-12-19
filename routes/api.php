@@ -7,6 +7,7 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ToppingController;
 use App\Http\Controllers\VoucherController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\AnalyzeController;
 use App\Http\Controllers\RecommenderSystem\AprioriController;
 use App\Http\Controllers\RecommenderSystem\FP_GrowthController;
 use App\Http\Controllers\RecommenderSystem\RecommendationController;
@@ -82,7 +83,7 @@ Route::group(['prefix' => 'v1'], function () {
             Route::get('getSuccessOrders', [OrderController::class, 'getSuccessOrders']); // http://localhost:8000/api/v1/admin/order/getSuccessOrder
             Route::get('getUnsuccessOrders', [OrderController::class, 'getUnsuccessOrders']); // http://localhost:8000/api/v1/admin/order/getUnsuccessOrder
             Route::get('getDeliveryOrders', [OrderController::class, 'getDeliveryOrders']); // http://localhost:8000/api/v1/admin/order/getDeliveryOrders
-            Route::get('analytics', [OrderController::class, 'getAnalyzeOrders']); // http://localhost:8000/api/v1/admin/order/analytics?timeRange=week
+            Route::get('analytics', [AnalyzeController::class, 'getAnalyzeOrders']); // http://localhost:8000/api/v1/admin/order/getAnalyzeOrders?timeRange=week
         });
 
         //api cho recommender system
