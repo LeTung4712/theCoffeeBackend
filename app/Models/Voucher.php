@@ -22,4 +22,10 @@ class Voucher extends Model
         'active',           //trạng thái
         'limit_per_user'    //số lượng mỗi user có thể sử dụng
     ];
+
+    protected $casts = [
+        'discount_percent' => 'decimal:2',
+        'max_discount_amount' => 'decimal:2',
+        'min_order_amount' => 'decimal:2',
+    ];
 }

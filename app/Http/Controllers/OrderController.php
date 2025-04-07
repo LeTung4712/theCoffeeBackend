@@ -1,13 +1,15 @@
 <?php
-
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Models\Product;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\Product;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 
 class OrderController extends Controller
 {
@@ -30,7 +32,7 @@ class OrderController extends Controller
                 ],
             ]
         );
-        if (!auth('admin')->check()) { //
+        if (! auth('admin')->check()) { //
             return response()->json([
                 'message' => 'Unauthorized',
             ], 401);
@@ -40,42 +42,94 @@ class OrderController extends Controller
     //them don hang
     public function addOrder(Request $request)
     {
+        // Validate dữ liệu đầu vào
+        $validator = Validator::make($request->all(), [
+            'user_id'                     => 'required|exists:users,id',
+            'user_name'                   => 'required|string|max:100',
+            'mobile_no'                   => 'required|string|max:15',
+            'address'                     => 'required|string',
+            'payment_method'              => 'required|in:cod,vnpay,momo,zalopay',
+            'products'                    => 'required|array|min:1',
+            'products.*.product_id'       => 'required|exists:products,id',
+            'products.*.product_quantity' => 'required|integer|min:1',
+            'products.*.size'             => 'required|in:S,M,L',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['message' => 'Dữ liệu không hợp lệ', 'errors' => $validator->errors()], 422);
+        }
+
         try {
-            // Tạo đơn hàng trước nhưng chưa lưu
+            // Sử dụng transaction để đảm bảo tính toàn vẹn dữ liệu
+            DB::beginTransaction();
+
+            // Tạo mã đơn hàng duy nhất
+            do {
+                $orderCode = 'TCH' . time() . strtoupper(Str::random(6));
+            } while (Order::where('order_code', $orderCode)->exists());
+
+            // Tạo đơn hàng
             $order = new Order([
-                'user_id' => (int) $request->user_id,
-                'user_name' => (string) $request->user_name,
-                'mobile_no' => (string) $request->mobile_no,
-                'address' => (string) $request->address,
-                'note' => (string) $request->note,
-                'shipping_fee' => (float) $request->shipping_fee,
-                'total_price' => (float) $request->total_price,
-                'discount_amount' => (float) $request->discount_amount,
-                'final_price' => (float) $request->final_price,
-                'payment_method' => (string) $request->payment_method,
-                'status' => '0',
-                'order_time' => Carbon::now(),
+                'user_id'         => (int) $request->user_id,
+                'user_name'       => (string) $request->user_name,
+                'mobile_no'       => (string) $request->mobile_no,
+                'address'         => (string) $request->address,
+                'note'            => (string) $request->note ?? '',
+                'shipping_fee'    => (float) $request->shipping_fee ?? 0,
+                'total_price'     => (float) $request->total_price,
+                'discount_amount' => (float) $request->discount_amount ?? 0,
+                'final_price'     => (float) $request->final_price,
+                'payment_method'  => (string) $request->payment_method,
+                'payment_status'  => '0',
+                'status'          => '0',
+                'order_code'      => $orderCode,
+                //'order_time'      => Carbon::now(),
             ]);
 
-            // Gán giá trị cho order_id trước khi lưu
-            $order->order_code = "TCH" . time() . "" . $order->id; // Lưu ý: order->id sẽ là null tại thời điểm này
-            $order->save(); // Lưu đơn hàng vào cơ sở dữ liệu
+            // Kiểm tra lại final_price
+            $calculatedFinalPrice = $order->total_price - $order->discount_amount + $order->shipping_fee;
+            if (abs($calculatedFinalPrice - $order->final_price) > 0.01) {
+                throw new \Exception('Tổng tiền đơn hàng không khớp với tính toán');
+            }
+
+            // Lưu đơn hàng (một lần duy nhất)
+            $order->save();
+
+            // Thêm các sản phẩm vào đơn hàng
             foreach ($request->products as $product) {
+                // Kiểm tra sản phẩm tồn tại
+                $productInfo = Product::find($product['product_id']);
+                if (! $productInfo) {
+                    throw new \Exception('Sản phẩm không tồn tại: ' . $product['product_id']);
+                }
+
                 OrderItem::create([
-                    'order_id' => $order->id,
-                    'product_id' => (int) $product['product_id'],
-                    'product_name' => (string) $product['product_name'],
-                    'product_price' => (float) $product['product_price'],
+                    'order_id'         => $order->id,
+                    'product_id'       => (int) $product['product_id'],
+                    'product_name'     => (string) $product['product_name'] ?? $productInfo->name,
+                    'product_price'    => (float) $product['product_price'] ?? $productInfo->price,
                     'product_quantity' => (int) $product['product_quantity'],
-                    'topping_items' => json_encode($product['topping_items']),
-                    'size' => (string) $product['size'],
-                    'item_note' => (string) $product['item_note'],
+                    'topping_items'    => json_encode($product['topping_items'] ?? []),
+                    'size'             => (string) $product['size'],
+                    'item_note'        => (string) $product['item_note'] ?? '',
                 ]);
             }
 
-            return response()->json(['message' => 'Đặt hàng thành công', 'order_code' => $order->order_code], 200);
+            // Nếu mọi thứ OK, commit transaction
+            DB::commit();
+
+            return response()->json([
+                'message'    => 'Đặt hàng thành công',
+                'order_code' => $order->order_code,
+            ], 200);
         } catch (\Exception $err) {
-            return response()->json(['message' => 'Đặt hàng thất bại', 'error' => $err->getMessage(), 'order_code' => null], 400);
+            // Nếu có lỗi, rollback tất cả thay đổi
+            DB::rollBack();
+            return response()->json([
+                'message'    => 'Đặt hàng thất bại',
+                'error'      => $err->getMessage(),
+                'order_code' => null,
+            ], 400);
         }
     }
 
@@ -83,7 +137,7 @@ class OrderController extends Controller
     public function paidOrder(Request $request)
     {
         $order = Order::where('id', $request->order_id)->first();
-        if (!$order) {
+        if (! $order) {
             return response()->json(['message' => 'Không tìm thấy đơn hàng'], 404);
         }
         try {
@@ -99,7 +153,7 @@ class OrderController extends Controller
     public function acceptOrder(Request $request)
     {
         $order = Order::where('id', $request->order_id)->first();
-        if (!$order) {
+        if (! $order) {
             return response()->json(['message' => 'Không tìm thấy đơn hàng'], 404);
         }
         try {
@@ -115,7 +169,7 @@ class OrderController extends Controller
     public function successOrder(Request $request)
     {
         $order = Order::where('id', $request->order_id)->first();
-        if (!$order) {
+        if (! $order) {
             return response()->json(['message' => 'Không tìm thấy đơn hàng'], 404);
         }
         try {
@@ -131,7 +185,7 @@ class OrderController extends Controller
     public function cancelOrder(Request $request)
     {
         $order = Order::where('id', $request->order_id)->first();
-        if (!$order) {
+        if (! $order) {
             return response()->json(['message' => 'Không tìm thấy đơn hàng'], 404);
         }
         try {
@@ -158,10 +212,10 @@ class OrderController extends Controller
             }
 
             // Chuyển đổi các giá trị số sang dạng số
-            $order->total_price = (float) $order->total_price;
+            $order->total_price     = (float) $order->total_price;
             $order->discount_amount = (float) $order->discount_amount;
-            $order->shipping_fee = (float) $order->shipping_fee;
-            $order->final_price = (float) $order->final_price;
+            $order->shipping_fee    = (float) $order->shipping_fee;
+            $order->final_price     = (float) $order->final_price;
         }
 
         return $orders->isEmpty()
@@ -173,7 +227,7 @@ class OrderController extends Controller
     public function getOrderInfo(Request $request)
     {
         $order = Order::where('order_code', $request->order_code)->with('orderItems')->first();
-        if (!$order) {
+        if (! $order) {
             return response()->json(['message' => 'Không tìm thấy đơn hàng'], 404);
         }
 
@@ -183,10 +237,10 @@ class OrderController extends Controller
             $item->topping_items = $item->topping_items ? json_decode($item->topping_items, true) : [];
         }
         // Chuyển đổi các giá trị số sang dạng số
-        $order->total_price = (float) $order->total_price;
+        $order->total_price     = (float) $order->total_price;
         $order->discount_amount = (float) $order->discount_amount;
-        $order->shipping_fee = (float) $order->shipping_fee;
-        $order->final_price = (float) $order->final_price;
+        $order->shipping_fee    = (float) $order->shipping_fee;
+        $order->final_price     = (float) $order->final_price;
 
         return $order
         ? response()->json(['message' => 'Lấy thông tin đơn hàng thành công', 'order' => $order], 200)
@@ -209,10 +263,10 @@ class OrderController extends Controller
                 $item->topping_items = json_decode($item->topping_items, true);
             }
             // Chuyển đổi các giá trị số sang dạng số
-            $order->total_price = (float) $order->total_price;
+            $order->total_price     = (float) $order->total_price;
             $order->discount_amount = (float) $order->discount_amount;
-            $order->shipping_fee = (float) $order->shipping_fee;
-            $order->final_price = (float) $order->final_price;
+            $order->shipping_fee    = (float) $order->shipping_fee;
+            $order->final_price     = (float) $order->final_price;
         }
         return $orders->isEmpty()
         ? response()->json(['message' => 'Không tìm thấy đơn hàng'], 404)
@@ -236,10 +290,10 @@ class OrderController extends Controller
                 $item->topping_items = json_decode($item->topping_items, true);
             }
             // Chuyển đổi các giá trị số sang dạng số
-            $order->total_price = (float) $order->total_price;
+            $order->total_price     = (float) $order->total_price;
             $order->discount_amount = (float) $order->discount_amount;
-            $order->shipping_fee = (float) $order->shipping_fee;
-            $order->final_price = (float) $order->final_price;
+            $order->shipping_fee    = (float) $order->shipping_fee;
+            $order->final_price     = (float) $order->final_price;
         }
 
         return $orders->isEmpty()
@@ -262,10 +316,10 @@ class OrderController extends Controller
                 $item->topping_items = json_decode($item->topping_items, true);
             }
             // Chuyển đổi các giá trị số sang dạng số
-            $order->total_price = (float) $order->total_price;
+            $order->total_price     = (float) $order->total_price;
             $order->discount_amount = (float) $order->discount_amount;
-            $order->shipping_fee = (float) $order->shipping_fee;
-            $order->final_price = (float) $order->final_price;
+            $order->shipping_fee    = (float) $order->shipping_fee;
+            $order->final_price     = (float) $order->final_price;
         }
         return $orders->isEmpty()
         ? response()->json(['message' => 'Không tìm thấy đơn hàng'], 404)

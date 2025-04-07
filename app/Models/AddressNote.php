@@ -20,6 +20,10 @@ class AddressNote extends Model
         'ward_code',
     ];
 
+    protected $casts = [
+        'is_default' => 'boolean',
+    ];
+
     public function user()
     {
         return $this->hasOne(User::class, 'id', 'user_id');

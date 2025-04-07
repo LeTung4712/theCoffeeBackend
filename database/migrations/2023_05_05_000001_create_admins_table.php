@@ -15,6 +15,7 @@ return new class extends Migration
             $table->id();
             $table->string('username')->unique(); //Tên đăng nhập
             $table->string('password'); //Mật khẩu
+            $table->rememberToken(); //Token để lưu trữ thông tin đăng nhập
             $table->timestamps();
         });
     }

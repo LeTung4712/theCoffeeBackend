@@ -18,6 +18,12 @@ class Product extends Model
         'image_url'
     ];
 
+    protected $casts = [
+        'price' => 'decimal:2',
+        'price_sale' => 'decimal:2',
+        'active' => 'boolean',
+    ];
+
     public function Category() 
     {
         return $this->hasOne(Category::class, 'id', 'category_id') // trả về 1 category có id = category_id của product đó 

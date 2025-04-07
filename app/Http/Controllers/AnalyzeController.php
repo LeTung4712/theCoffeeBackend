@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Models\Product;
 use App\Models\Order;
 use App\Models\OrderItem;
 use Carbon\Carbon;
@@ -39,7 +38,7 @@ class AnalyzeController extends Controller
         $orders = Order::where('created_at', '>=', $startDate)
             ->where('created_at', '<=', $endDate)
             ->get();
-        
+
         // Lấy dữ liệu đơn hàng trước khoảng thời gian này
         $previousOrders = Order::where('created_at', '<', $startDate);
 
@@ -54,14 +53,14 @@ class AnalyzeController extends Controller
             'paymentMoMo' => $orders->where('payment_method', 'momo')->count(),
             'paymentZalopay' => $orders->where('payment_method', 'zalopay')->count(),
             'paymentVNPay' => $orders->where('payment_method', 'vnpay')->count(),
-            'newCustomers' => $orders->unique('user_id')->count()
+            'newCustomers' => $orders->unique('user_id')->count(),
         ];
 
         // Tính tỷ lệ tăng trưởng
         $previousStats = [
             'revenue' => (float) $previousOrders->sum('final_price'),
             'orders' => $previousOrders->count(),
-            'customers' => $previousOrders->distinct('user_id')->count('user_id')
+            'customers' => $previousOrders->distinct('user_id')->count('user_id'),
         ];
 
         $growthRates = $this->calculateGrowthRates($stats, $previousStats);
@@ -82,14 +81,14 @@ class AnalyzeController extends Controller
             'orderStatusByTimeRange' => [
                 'completed' => $stats['completedOrders'],
                 'pending' => $stats['pendingOrders'],
-                'canceled' => $stats['canceledOrders']
+                'canceled' => $stats['canceledOrders'],
             ],
             'paymentMethodByTimeRange' => [
                 'COD' => $stats['paymentCOD'],
                 'MoMo' => $stats['paymentMoMo'],
                 'Zalopay' => $stats['paymentZalopay'],
-                'VNPay' => $stats['paymentVNPay']
-            ]
+                'VNPay' => $stats['paymentVNPay'],
+            ],
         ], 200);
     }
 
@@ -97,10 +96,10 @@ class AnalyzeController extends Controller
     {
         $startDate = now();
         switch ($timeRange) {
-            case 'month': return $startDate->subMonth();
-            case 'quarter': return $startDate->subQuarter();
-            case 'year': return $startDate->subYear();
-            default: return $startDate->subWeek();
+            case 'month':return $startDate->subMonth();
+            case 'quarter':return $startDate->subQuarter();
+            case 'year':return $startDate->subYear();
+            default:return $startDate->subWeek();
         }
     }
 
@@ -109,7 +108,7 @@ class AnalyzeController extends Controller
         return [
             'revenue' => $this->calculateGrowthRate($current['totalRevenue'], $previous['revenue']),
             'orders' => $this->calculateGrowthRate($current['totalOrders'], $previous['orders']),
-            'customers' => $this->calculateGrowthRate($current['newCustomers'], $previous['customers'])
+            'customers' => $this->calculateGrowthRate($current['newCustomers'], $previous['customers']),
         ];
     }
 
@@ -142,6 +141,9 @@ class AnalyzeController extends Controller
         $endDate = now();
         $labels = [];
         $revenueData = [];
+        $costData = [];
+        $profitData = [];
+        $costPercent = 0.3;
 
         switch ($timeRange) {
             case 'year':
@@ -163,7 +165,9 @@ class AnalyzeController extends Controller
                     $monthRevenue = $revenues->where('month', $date->month)
                         ->where('year', $date->year)
                         ->first();
-                    $revenueData[] = $monthRevenue ? $monthRevenue->total_revenue : 0;
+                    $revenueData[] = $monthRevenue ? (float)$monthRevenue->total_revenue : 0;
+                    $costData[] = $monthRevenue ? $costPercent * $monthRevenue->total_revenue : 0;
+                    $profitData[] = $monthRevenue ? (1 - $costPercent) * $monthRevenue->total_revenue : 0;
                 }
                 break;
 
@@ -186,7 +190,9 @@ class AnalyzeController extends Controller
                     $monthRevenue = $revenues->where('month', $date->month)
                         ->where('year', $date->year)
                         ->first();
-                    $revenueData[] = $monthRevenue ? $monthRevenue->total_revenue : 0;
+                    $revenueData[] = $monthRevenue ? (float)$monthRevenue->total_revenue : 0;
+                    $costData[] = $monthRevenue ? $costPercent * $monthRevenue->total_revenue : 0;
+                    $profitData[] = $monthRevenue ? (1 - $costPercent) * $monthRevenue->total_revenue : 0;
                 }
                 break;
 
@@ -205,7 +211,9 @@ class AnalyzeController extends Controller
                     $date = now()->subDays($i)->format('Y-m-d');
                     $labels[] = Carbon::parse($date)->format('d/m');
                     $dayRevenue = $revenues->where('date', $date)->first();
-                    $revenueData[] = $dayRevenue ? $dayRevenue->total_revenue : 0;
+                    $revenueData[] = $dayRevenue ? (float)$dayRevenue->total_revenue : 0;
+                    $costData[] = $dayRevenue ? $costPercent * $dayRevenue->total_revenue : 0;
+                    $profitData[] = $dayRevenue ? (1 - $costPercent) * $dayRevenue->total_revenue : 0;
                 }
                 break;
 
@@ -224,7 +232,9 @@ class AnalyzeController extends Controller
                     $date = now()->subDays($i)->format('Y-m-d');
                     $labels[] = Carbon::parse($date)->format('d/m');
                     $dayRevenue = $revenues->where('date', $date)->first();
-                    $revenueData[] = $dayRevenue ? $dayRevenue->total_revenue : 0;
+                    $revenueData[] = $dayRevenue ? (float)$dayRevenue->total_revenue : 0;
+                    $costData[] = $dayRevenue ? $costPercent * $dayRevenue->total_revenue : 0;
+                    $profitData[] = $dayRevenue ? (1 - $costPercent) * $dayRevenue->total_revenue : 0;
                 }
                 break;
         }
@@ -232,6 +242,8 @@ class AnalyzeController extends Controller
         return [
             'labels' => $labels,
             'revenueData' => $revenueData,
+            'costData' => $costData,
+            'profitData' => $profitData,
         ];
     }
 }

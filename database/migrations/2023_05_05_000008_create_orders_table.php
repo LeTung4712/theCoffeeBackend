@@ -18,18 +18,20 @@ return new class extends Migration
             $table->string('user_name', 100);
             $table->string('mobile_no', 15);
             $table->enum('status', ['-1', '0', '1', '2', '3'])
-                  ->default('0')
-                  ->comment('-1: cancelled, 0: pending, 1: paid, 2: shipping, 3: completed');
+                ->default('0')
+                ->comment('-1: cancelled, 0: pending, 1: confirmed, 2: shipping, 3: completed');
+            $table->enum('payment_status', ['0', '1'])
+                ->default('0')
+                ->comment('0: unpaid, 1: paid');
             $table->string('address');
-            $table->text('note')->nullable(); //Ghi chú đơn hàng
-            $table->decimal('total_price', 10, 2); //Tổng tiền hàng
+            $table->text('note')->nullable();                      //Ghi chú đơn hàng
+            $table->decimal('total_price', 10, 2);                 //Tổng tiền hàng
             $table->decimal('discount_amount', 10, 2)->default(0); //Số tiền giảm giá
-            $table->decimal('shipping_fee', 10, 2)->default(0); //Phí vận chuyển
-            $table->decimal('final_price', 10, 2) 
-                  ->comment('total_price - discount_amount + shipping_fee'); //Tổng tiền thanh toán
+            $table->decimal('shipping_fee', 10, 2)->default(0);    //Phí vận chuyển
+            $table->decimal('final_price', 10, 2)
+                ->comment('total_price - discount_amount + shipping_fee'); //Tổng tiền thanh toán
             $table->enum('payment_method', ['cod', 'vnpay', 'momo', 'zalopay'])
-                  ->default('cod'); //Phương thức thanh toán
-            $table->datetime('order_time'); //Thời gian đặt hàng
+                ->default('cod'); //Phương thức thanh toán
             $table->softDeletes();
             $table->timestamps();
             $table->index(['user_id', 'id']);
