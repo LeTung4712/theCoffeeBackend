@@ -17,6 +17,7 @@ return new class extends Migration
             $table->string('antecedent'); //Tiền đề
             $table->string('consequent'); //Kết luận
             $table->decimal('confidence', 5, 4); //Độ tin cậy
+            $table->decimal('lift', 5, 4)->nullable(); //Chỉ số Lift 
             $table->timestamps();
         });
 

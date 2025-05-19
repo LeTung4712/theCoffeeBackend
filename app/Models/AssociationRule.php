@@ -8,5 +8,5 @@ use Illuminate\Database\Eloquent\Model;
 class AssociationRule extends Model
 {
     use HasFactory;
-    protected $fillable = ['antecedent', 'consequent', 'confidence'];
+    protected $fillable = ['antecedent', 'consequent', 'confidence', 'lift'];
 }
