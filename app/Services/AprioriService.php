@@ -203,19 +203,24 @@ class AprioriService
     {
         $numItems = count($frequentItemset);
         for ($i = 1; $i < $numItems; $i++) {
-            $combinations = new Combinations($frequentItemset, $i);  // Tạo tập hợp các tập con có i phần tử
-            foreach ($combinations->generator() as $antecedent) {    // Duyệt qua các tập con
-                sort($antecedent);                                       // Sắp xếp tập con
-                                                                         //var_dump($antecedent);
-                $consequent = array_diff($frequentItemset, $antecedent); // Tìm tập hợp phần tử không thuộc tập con
-                                                                         //var_dump($consequent);
-                sort($consequent);                                       // Sắp xếp tập hợp phần tử không thuộc tập con
+            $combinations = new Combinations($frequentItemset, $i);
+            foreach ($combinations->generator() as $antecedent) {
+                sort($antecedent);
+                $consequent = array_diff($frequentItemset, $antecedent);
+                sort($consequent);
 
                 if (! empty($antecedent) && ! empty($consequent)) {
-                    $confidence = $this->calculateConfidence($antecedent, $consequent);                        // Tính confidence
-                                                                                                               //$associationRules[] = [implode(',', $antecedent), implode(',', $consequent), $confidence];
-                    if ($confidence >= $this->confidence) {                                                    // Nếu confidence lớn hơn ngưỡng
-                        $associationRules[] = [implode(',', $antecedent), implode(',', $consequent), $confidence]; // Thêm luật kết hợp vào mảng luật
+                    $confidence = $this->calculateConfidence($antecedent, $consequent);
+                    if ($confidence >= $this->confidence) {
+                        $support            = $this->calculateSupport(implode(',', $frequentItemset));
+                        $lift               = $this->calculateLift($antecedent, $consequent);
+                        $associationRules[] = [
+                            implode(',', $antecedent),
+                            implode(',', $consequent),
+                            $confidence,
+                            $support,
+                            $lift,
+                        ];
                     }
                 }
             }
@@ -256,5 +261,27 @@ class AprioriService
             return 0;
         }
         return $this->supports[$itemset];
+    }
+
+    /**
+     * Tính lift của một luật kết hợp
+     * @param array $antecedent vd: ['A']
+     * @param array $consequent vd: ['B']
+     * @return float
+     */
+    private function calculateLift($antecedent, $consequent)
+    {
+        $union = array_unique(array_merge($antecedent, $consequent));
+        sort($union);
+
+        $supportUnion      = $this->calculateSupport(implode(',', $union));
+        $supportAntecedent = $this->calculateSupport(implode(',', $antecedent));
+        $supportConsequent = $this->calculateSupport(implode(',', $consequent));
+
+        if ($supportAntecedent * $supportConsequent == 0) {
+            return 0;
+        }
+
+        return round($supportUnion / ($supportAntecedent * $supportConsequent), 3);
     }
 }

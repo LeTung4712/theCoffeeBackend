@@ -54,6 +54,8 @@ class RecommendationController extends Controller
                 str_replace('I', '', $rule[0]),
                 str_replace('I', '', $rule[1]),
                 $rule[2],
+                $rule[3], // support
+                $rule[4], // lift
             ];
         }, $associationRules);
 
@@ -65,10 +67,14 @@ class RecommendationController extends Controller
             $antecedent = $rule[0];
             $consequent = $rule[1];
             $confidence = $rule[2];
+            $support    = $rule[3];
+            $lift       = $rule[4];
             AssociationRule::create([
                 'antecedent' => $antecedent,
                 'consequent' => $consequent,
                 'confidence' => $confidence,
+                'support'    => $support,
+                'lift'       => $lift,
             ]);
         }
 
@@ -90,6 +96,8 @@ class RecommendationController extends Controller
                 'antecedent'          => $rule[0],
                 'consequent'          => $rule[1],
                 'confidence'          => $rule[2],
+                'support'             => $rule[3],
+                'lift'                => $rule[4],
                 'antecedent_products' => $antecedent_products,
                 'consequent_products' => $consequent_products,
                 'updated_at'          => now(),
@@ -107,7 +115,7 @@ class RecommendationController extends Controller
                 'totalRules'        => count($associationRules),
                 'executionTime'     => $executionTime, // Thời gian thực thi (milliseconds)
                 'frequentItemsets'  => $frequentItemsets,
-                'associationRules'  => $rulesWithProducts,
+                //'associationRules'  => $rulesWithProducts,
             ], 200);
         }
     }
