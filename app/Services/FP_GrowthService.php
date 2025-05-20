@@ -38,13 +38,20 @@ class FP_GrowthService
         $fpTree = new FPTree($transactions, $this->minSupport, null, 0);
         // Bước 2: Tạo các mẫu kết hợp thường xuyên từ FP-Tree
         $frequentItemsets = $fpTree->minePatterns($this->minSupport);
+
+        // Chuyển đổi support từ số lần xuất hiện sang tỉ lệ
+        $totalTransactions = count($transactions);
+        foreach ($frequentItemsets as $pattern => $count) {
+            $frequentItemsets[$pattern] = round($count / $totalTransactions, 3);
+        }
+
         // sort theo key
         ksort($frequentItemsets);
         return $frequentItemsets;
     }
 
 //========================================================= Tạo luật kết hợp (Association Rules) =======================================================================
-    
+
     /**
      * Tạo luật kết hợp từ các mẫu phổ biến
      * @param array $patterns
@@ -53,31 +60,41 @@ class FP_GrowthService
     public function generateAssociationRules(array $patterns): array
     {
         $rules = [];
-        foreach (array_keys($patterns) as $pattern) { // Duyệt qua các mẫu phổ biến
-            $itemSet = explode(',', $pattern); // Chuyển mẫu phổ biến thành mảng các sản phẩm 
-            $upperSupport = $patterns[$pattern]; // Support của mẫu phổ biến
-            for ($i = 1; $i < count($itemSet); $i++) { // Duyệt qua các tập con của mẫu phổ biến
-                $combinations = new Combinations($itemSet, $i); // Tạo tập hợp các tập con có i phần tử
-                foreach ($combinations->generator() as $antecedent) { // Duyệt qua các tập con 
-                    sort($antecedent); // Sắp xếp tập con
-                    $antecedentStr = implode(',', $antecedent); // Chuyển tập con thành chuỗi
-                    //var_dump($antecedentStr);
-                    $consequent = array_diff($itemSet, $antecedent); // Tìm tập hợp phần tử không thuộc tập con
-                    sort($consequent); // Sắp xếp tập hợp phần tử không thuộc tập con
-                    $consequentStr = implode(',', $consequent); // Chuyển tập hợp phần tử không thuộc tập con thành chuỗi
-                    if (isset($patterns[$antecedentStr])) { // Nếu tập con tồn tại trong mảng mẫu phổ biến
-                        $lowerSupport = $patterns[$antecedentStr];  // Support của tập con 
-                        $confidence = round($upperSupport / $lowerSupport, 3); // Tính độ tin cậy
-                        //$rules[] = [$antecedentStr, $consequentStr, $confidence]; // Thêm luật kết hợp vào mảng luật
+        foreach (array_keys($patterns) as $pattern) {            // Duyệt qua các mẫu phổ biến
+            $itemSet      = explode(',', $pattern);                  // Chuyển mẫu phổ biến thành mảng các sản phẩm
+            $upperSupport = $patterns[$pattern];                     // Support của mẫu phổ biến (đã là tỉ lệ)
+            for ($i = 1; $i < count($itemSet); $i++) {               // Duyệt qua các tập con của mẫu phổ biến
+                $combinations = new Combinations($itemSet, $i);          // Tạo tập hợp các tập con có i phần tử
+                foreach ($combinations->generator() as $antecedent) {    // Duyệt qua các tập con
+                    sort($antecedent);                                       // Sắp xếp tập con
+                    $antecedentStr = implode(',', $antecedent);              // Chuyển tập con thành chuỗi
+                    $consequent    = array_diff($itemSet, $antecedent);      // Tìm tập hợp phần tử không thuộc tập con
+                    sort($consequent);                                       // Sắp xếp tập hợp phần tử không thuộc tập con
+                    $consequentStr = implode(',', $consequent);              // Chuyển tập hợp phần tử không thuộc tập con thành chuỗi
+                    if (isset($patterns[$antecedentStr])) {                  // Nếu tập con tồn tại trong mảng mẫu phổ biến
+                        $lowerSupport = $patterns[$antecedentStr];               // Support của tập con (đã là tỉ lệ)
+                        $confidence   = round($upperSupport / $lowerSupport, 3); // Tính độ tin cậy
+
                         if ($confidence >= $this->confidence) { // Nếu độ tin cậy lớn hơn ngưỡng
-                            $rules[] = [$antecedentStr, $consequentStr, $confidence]; // Thêm luật kết hợp vào mảng luật
+                                                                    // Tính lift
+                            $consequentSupport = isset($patterns[$consequentStr]) ? $patterns[$consequentStr] : 0;
+                            $lift              = $consequentSupport > 0 ? round($confidence / $consequentSupport, 3) : 0;
+
+                            // Thêm luật kết hợp vào mảng luật với support và lift
+                            $rules[] = [
+                                $antecedentStr,
+                                $consequentStr,
+                                $confidence,
+                                $upperSupport, // support của luật (đã là tỉ lệ)
+                                $lift,
+                            ];
                         }
                     }
                 }
             }
         }
         //sort theo confidence
-        usort($rules, function($a, $b) {
+        usort($rules, function ($a, $b) {
             return $b[2] <=> $a[2];
         });
         return $rules;

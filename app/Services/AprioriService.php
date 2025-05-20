@@ -105,7 +105,7 @@ class AprioriService
                     $support++;
                 }
             }
-            $supports[implode(',', $candidateSet)] = $support / count($transactions);
+            $supports[implode(',', $candidateSet)] = round($support / count($transactions), 3);
         }
         return $supports;
     }
