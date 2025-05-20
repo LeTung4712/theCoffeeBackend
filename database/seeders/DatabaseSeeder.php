@@ -13,9 +13,11 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this -> call(Admins::class);
+        $this -> call(Users::class);
+        $this -> call(Address::class);
         $this -> call(Toppings::class);
         $this -> call(Categories::class);
-        
+        $this -> call(Vouchers::class);
         
     }
 }

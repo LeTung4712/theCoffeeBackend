@@ -54,14 +54,6 @@ class Toppings extends Seeder
                 'created_at' => '2021-06-01 00:00:00',
                 'updated_at' => '2021-06-01 00:00:00',
             ],
-            [
-                'id' => 6,
-                'name' => 'Không Topping',
-                'price' => 0,
-                'active' => true, 
-                'created_at' => '2021-06-01 00:00:00',
-                'updated_at' => '2021-06-01 00:00:00',
-            ],
         ];
         Topping::truncate();
         Topping::insert($data);
