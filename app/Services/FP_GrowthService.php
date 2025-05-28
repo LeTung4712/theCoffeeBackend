@@ -37,8 +37,13 @@ class FP_GrowthService
         // Bước 1: Xây dựng cây FP-Tree từ danh sách giao dịch
         $fpTree = new FPTree($transactions, $this->minSupport, null, 0);
         // Bước 2: Tạo các mẫu kết hợp thường xuyên từ FP-Tree
-        $frequentItemsets = $fpTree->minePatterns($this->minSupport);
+        $frequentItemsets   = $fpTree->minePatterns($this->minSupport);
+        $singleItemSupports = $fpTree->getSingleItemSupports();
 
+        // Gộp kết quả và ưu tiên giá trị từ singleItemSupports cho các item đơn lẻ
+        foreach ($singleItemSupports as $item => $support) {
+            $frequentItemsets[$item] = $support;
+        }
         // Chuyển đổi support từ số lần xuất hiện sang tỉ lệ
         $totalTransactions = count($transactions);
         foreach ($frequentItemsets as $pattern => $count) {

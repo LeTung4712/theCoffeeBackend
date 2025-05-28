@@ -114,8 +114,8 @@ class RecommendationController extends Controller
                 'totalTransactions' => count($transactions),
                 'totalRules'        => count($associationRules),
                 'executionTime'     => $executionTime, // Thời gian thực thi (milliseconds)
-                'frequentItemsets'  => $frequentItemsets,
-                //'associationRules'  => $rulesWithProducts,
+                //'frequentItemsets'  => $frequentItemsets,
+                'associationRules'  => $rulesWithProducts,
             ], 200);
         }
     }
@@ -141,8 +141,9 @@ class RecommendationController extends Controller
             ->toArray();
 
         // Lấy luật kết hợp với ngưỡng confidence và giới hạn số lượng
-        $rules = AssociationRule::where('confidence', '>=', 0.3)
-            ->orderBy('confidence', 'desc')
+        $rules = AssociationRule::where('confidence', '>=', 0.75)
+            ->where('lift', '>=', 1.7)
+            ->orderBy('lift', 'desc')
             ->limit(500)
             ->get();
 
