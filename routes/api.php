@@ -73,14 +73,15 @@ Route::group(['prefix' => 'v1'], function () {
         //order api
         Route::group(['prefix' => 'order'], function () {
             Route::post('addOrder', [OrderController::class, 'addOrder']);                    // http://localhost:8000/api/v1/admin/order/addOrder?user_id=1&user_name=abc&mobile_no=0828035636&address=abc&note=abc&total_price=10000&payment_method=1&products=[{"product_id":1,"product_count":1,"topping_id":1,"topping_count":1,"size":"M","price":10000}]
-            Route::put('acceptOrder', [OrderController::class, 'acceptOrder']);               // http://localhost:8000/api/v1/admin/order/acceptOrder?order_id=TCH16903883611
+            Route::put('startDelivery', [OrderController::class, 'startDelivery']);               // http://localhost:8000/api/v1/admin/order/startDelivery?order_id=TCH16903883611
             Route::put('paidOrder', [OrderController::class, 'paidOrder']);                   // http://localhost:8000/api/v1/admin/order/paidOrder?order_id=TCH16903883611
             Route::put('successOrder', [OrderController::class, 'successOrder']);             // http://localhost:8000/api/v1/admin/order/successOrder?order_id=TCH16903883611
             Route::put('cancelOrder', [OrderController::class, 'cancelOrder']);               // http://localhost:8000/api/v1/admin/order/cancelOrder?order_id=TCH16903883611
             Route::get('getOrderInfo', [OrderController::class, 'getOrderInfo']);             // http://
             Route::get('getSuccessOrders', [OrderController::class, 'getSuccessOrders']);     // http://localhost:8000/api/v1/admin/order/getSuccessOrder
-            Route::get('getUnsuccessOrders', [OrderController::class, 'getUnsuccessOrders']); // http://localhost:8000/api/v1/admin/order/getUnsuccessOrder
-            Route::get('getDeliveryOrders', [OrderController::class, 'getDeliveryOrders']);   // http://localhost:8000/api/v1/admin/order/getDeliveryOrders
+            Route::get('getPendingPaymentOrders', [OrderController::class, 'getPendingPaymentOrders']); // http://localhost:8000/api/v1/admin/order/getPendingPaymentOrders
+            Route::get('getPendingDeliveryOrders', [OrderController::class, 'getPendingDeliveryOrders']); // http://localhost:8000/api/v1/admin/order/getPendingDeliveryOrders
+            Route::get('getDeliveringOrders', [OrderController::class, 'getDeliveringOrders']); // http://localhost:8000/api/v1/admin/order/getDeliveringOrders
             Route::get('analytics', [AnalyzeController::class, 'getAnalyzeOrders']);          // http://localhost:8000/api/v1/admin/order/getAnalyzeOrders?timeRange=week
         });
 

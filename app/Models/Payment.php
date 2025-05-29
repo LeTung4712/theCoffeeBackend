@@ -16,7 +16,6 @@ class Payment extends Model
         'status',
         'transaction_id',
         'payment_gateway_response',
-        'notes',
     ];
 
     protected $casts = [

@@ -11,7 +11,7 @@
         "laravel/framework": "^10.10",
         "laravel/sanctum": "^3.2",
         "laravel/tinker": "^2.8",
-        "pusher/pusher-php-server": "*",
+        "pusher/pusher-php-server": "^7.2",
         "twilio/sdk": "^7.4",
         "tymon/jwt-auth": "^2.0"
     },

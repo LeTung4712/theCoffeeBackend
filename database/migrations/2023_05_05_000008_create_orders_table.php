@@ -17,9 +17,9 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained()->onDelete('restrict');
             $table->string('user_name', 100);
             $table->string('mobile_no', 15);
-            $table->enum('status', ['-1', '0', '1', '2', '3'])
+            $table->enum('status', ['-1', '0', '1', '2'])
                 ->default('0')
-                ->comment('-1: cancelled, 0: pending, 1: confirmed, 2: shipping, 3: completed');
+                ->comment('-1: cancelled, 0: pending, 1: shipping, 2: completed');
             $table->enum('payment_status', ['0', '1'])
                 ->default('0')
                 ->comment('0: unpaid, 1: paid');
