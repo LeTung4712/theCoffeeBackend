@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\AuthAdminController;
 use App\Http\Controllers\AnalyzeController;
 use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\GoongMapController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProductController;
@@ -72,17 +73,17 @@ Route::group(['prefix' => 'v1'], function () {
         });
         //order api
         Route::group(['prefix' => 'order'], function () {
-            Route::post('addOrder', [OrderController::class, 'addOrder']);                    // http://localhost:8000/api/v1/admin/order/addOrder?user_id=1&user_name=abc&mobile_no=0828035636&address=abc&note=abc&total_price=10000&payment_method=1&products=[{"product_id":1,"product_count":1,"topping_id":1,"topping_count":1,"size":"M","price":10000}]
-            Route::put('startDelivery', [OrderController::class, 'startDelivery']);               // http://localhost:8000/api/v1/admin/order/startDelivery?order_id=TCH16903883611
-            Route::put('paidOrder', [OrderController::class, 'paidOrder']);                   // http://localhost:8000/api/v1/admin/order/paidOrder?order_id=TCH16903883611
-            Route::put('successOrder', [OrderController::class, 'successOrder']);             // http://localhost:8000/api/v1/admin/order/successOrder?order_id=TCH16903883611
-            Route::put('cancelOrder', [OrderController::class, 'cancelOrder']);               // http://localhost:8000/api/v1/admin/order/cancelOrder?order_id=TCH16903883611
-            Route::get('getOrderInfo', [OrderController::class, 'getOrderInfo']);             // http://
-            Route::get('getSuccessOrders', [OrderController::class, 'getSuccessOrders']);     // http://localhost:8000/api/v1/admin/order/getSuccessOrder
-            Route::get('getPendingPaymentOrders', [OrderController::class, 'getPendingPaymentOrders']); // http://localhost:8000/api/v1/admin/order/getPendingPaymentOrders
+            Route::post('addOrder', [OrderController::class, 'addOrder']);                                // http://localhost:8000/api/v1/admin/order/addOrder?user_id=1&user_name=abc&mobile_no=0828035636&address=abc&note=abc&total_price=10000&payment_method=1&products=[{"product_id":1,"product_count":1,"topping_id":1,"topping_count":1,"size":"M","price":10000}]
+            Route::put('startDelivery', [OrderController::class, 'startDelivery']);                       // http://localhost:8000/api/v1/admin/order/startDelivery?order_id=TCH16903883611
+            Route::put('paidOrder', [OrderController::class, 'paidOrder']);                               // http://localhost:8000/api/v1/admin/order/paidOrder?order_id=TCH16903883611
+            Route::put('successOrder', [OrderController::class, 'successOrder']);                         // http://localhost:8000/api/v1/admin/order/successOrder?order_id=TCH16903883611
+            Route::put('cancelOrder', [OrderController::class, 'cancelOrder']);                           // http://localhost:8000/api/v1/admin/order/cancelOrder?order_id=TCH16903883611
+            Route::get('getOrderInfo', [OrderController::class, 'getOrderInfo']);                         // http://
+            Route::get('getSuccessOrders', [OrderController::class, 'getSuccessOrders']);                 // http://localhost:8000/api/v1/admin/order/getSuccessOrder
+            Route::get('getPendingPaymentOrders', [OrderController::class, 'getPendingPaymentOrders']);   // http://localhost:8000/api/v1/admin/order/getPendingPaymentOrders
             Route::get('getPendingDeliveryOrders', [OrderController::class, 'getPendingDeliveryOrders']); // http://localhost:8000/api/v1/admin/order/getPendingDeliveryOrders
-            Route::get('getDeliveringOrders', [OrderController::class, 'getDeliveringOrders']); // http://localhost:8000/api/v1/admin/order/getDeliveringOrders
-            Route::get('analytics', [AnalyzeController::class, 'getAnalyzeOrders']);          // http://localhost:8000/api/v1/admin/order/getAnalyzeOrders?timeRange=week
+            Route::get('getDeliveringOrders', [OrderController::class, 'getDeliveringOrders']);           // http://localhost:8000/api/v1/admin/order/getDeliveringOrders
+            Route::get('analytics', [AnalyzeController::class, 'getAnalyzeOrders']);                      // http://localhost:8000/api/v1/admin/order/getAnalyzeOrders?timeRange=week
         });
 
         //api cho recommender system
@@ -111,18 +112,20 @@ Route::group(['prefix' => 'v1'], function () {
 
     //api thanh toán
     Route::group(['prefix' => 'payment'], function () {
-        //=============================================== MOMO ================================================
+                                                                                         //=============================================== MOMO ================================================
         Route::post('momo', [PaymentController::class, 'momo_payment']);                 // http://localhost:8000/api/v1/payment/momo
         Route::post('momo/callback', [PaymentController::class, 'momo_callback']);       // Callback từ MOMO
-        //=============================================== COD ================================================
+                                                                                         //=============================================== COD ================================================
         Route::post('cod', [PaymentController::class, 'cod_payment']);                   // Đánh dấu thanh toán COD
         Route::post('cod/complete', [PaymentController::class, 'complete_cod_payment']); // Xác nhận đã thanh toán COD
-        //=============================================== VNPAY ================================================
-        Route::post('vnpay', [PaymentController::class, 'vnpay_payment']);                 // http://localhost:8000/api/v1/payment/vnpay
-        Route::post('vnpay/callback', [PaymentController::class, 'vnpay_callback']);       // Callback từ VNPAY
-        //=============================================== ZALOPAY ================================================
-        Route::post('zalopay', [PaymentController::class, 'zalopay_payment']);                 // http://localhost:8000/api/v1/payment/zalopay
-        Route::post('zalopay/callback', [PaymentController::class, 'zalopay_callback']);       // Callback từ ZALOPAY
+                                                                                         //=============================================== VNPAY ================================================
+        Route::post('vnpay', [PaymentController::class, 'vnpay_payment']);               // http://localhost:8000/api/v1/payment/vnpay
+        Route::post('vnpay/callback', [PaymentController::class, 'vnpay_callback']);     // Callback từ VNPAY
+                                                                                         //=============================================== ZALOPAY ================================================
+        Route::post('zalopay', [PaymentController::class, 'zalopay_payment']);           // http://localhost:8000/api/v1/payment/zalopay
+        Route::post('zalopay/callback', [PaymentController::class, 'zalopay_callback']); // Callback từ ZALOPAY
     });
+
+    Route::get('/map/autocomplete', [GoongMapController::class, 'searchAddress']); // http://localhost:8000/api/v1/map/autocomplete?query=abc
 
 });

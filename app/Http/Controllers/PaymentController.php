@@ -449,7 +449,7 @@ class PaymentController extends Controller
                 ]);
 
                 return response()->json([
-                    'order_url'   => $jsonResult['order_url'],
+                    'payUrl'   => $jsonResult['order_url'],
                     'order_token' => $jsonResult['order_token'],
                 ], 200);
             }

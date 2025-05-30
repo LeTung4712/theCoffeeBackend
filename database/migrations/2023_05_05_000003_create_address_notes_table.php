@@ -19,9 +19,7 @@ return new class extends Migration
             $table->string('mobile_no');                                      //Số điện thoại
             $table->string('address_type')->default('home');                  //Loại địa chỉ
             $table->boolean('is_default')->default(false);                    //Địa chỉ mặc định
-            $table->string('province_code', 10);                              //Mã tỉnh
-            $table->string('district_code', 10);
-            $table->string('ward_code', 10);
+            $table->string('place_id');                                      //Mã địa điểm
             $table->timestamps();
         });
     }

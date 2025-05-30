@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -12,12 +11,10 @@ class AddressNote extends Model
         'user_id',
         'user_name',
         'address',
+        'place_id',
         'mobile_no',
         'address_type',
         'is_default',
-        'province_code',
-        'district_code',
-        'ward_code',
     ];
 
     protected $casts = [
