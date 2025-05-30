@@ -111,10 +111,18 @@ Route::group(['prefix' => 'v1'], function () {
 
     //api thanh toán
     Route::group(['prefix' => 'payment'], function () {
+        //=============================================== MOMO ================================================
         Route::post('momo', [PaymentController::class, 'momo_payment']);                 // http://localhost:8000/api/v1/payment/momo
         Route::post('momo/callback', [PaymentController::class, 'momo_callback']);       // Callback từ MOMO
+        //=============================================== COD ================================================
         Route::post('cod', [PaymentController::class, 'cod_payment']);                   // Đánh dấu thanh toán COD
         Route::post('cod/complete', [PaymentController::class, 'complete_cod_payment']); // Xác nhận đã thanh toán COD
+        //=============================================== VNPAY ================================================
+        Route::post('vnpay', [PaymentController::class, 'vnpay_payment']);                 // http://localhost:8000/api/v1/payment/vnpay
+        Route::post('vnpay/callback', [PaymentController::class, 'vnpay_callback']);       // Callback từ VNPAY
+        //=============================================== ZALOPAY ================================================
+        Route::post('zalopay', [PaymentController::class, 'zalopay_payment']);                 // http://localhost:8000/api/v1/payment/zalopay
+        Route::post('zalopay/callback', [PaymentController::class, 'zalopay_callback']);       // Callback từ ZALOPAY
     });
 
 });

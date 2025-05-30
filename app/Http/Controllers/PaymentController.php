@@ -6,6 +6,7 @@ use App\Models\Order;
 use App\Models\Payment;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 
 class PaymentController extends Controller
 {
@@ -54,11 +55,6 @@ class PaymentController extends Controller
 
         if ($totalPaid >= $order->final_price) {
             $order->payment_status = '1'; // Đã thanh toán đủ
-
-            // Nếu đơn hàng đang ở trạng thái "pending" thì cập nhật thành "confirmed"
-            if ($order->status === '0') {
-                $order->status = '1';
-            }
         } else {
             $order->payment_status = '0'; // Chưa thanh toán
         }
@@ -68,6 +64,7 @@ class PaymentController extends Controller
         return $order;
     }
 
+    //=============================================== MOMO ================================================
     public function momo_payment(Request $request)
     {
         // Xác thực và tìm đơn hàng
@@ -162,8 +159,7 @@ class PaymentController extends Controller
 
             // Cập nhật payment record khi gặp lỗi
             $payment->update([
-                'status' => 'failed',
-                'notes'  => $e->getMessage(),
+                'status' => '2',
             ]);
 
             return response()->json([
@@ -218,6 +214,355 @@ class PaymentController extends Controller
         return redirect()->away(env('FRONTEND_URL') . '/payment/result?status=' . (($resultCode == '0') ? 'success' : 'failure') . '&order_code=' . $orderId);
     }
 
+    //=============================================== VNPAY ================================================
+    /**
+     * Tạo URL thanh toán VNPay
+     */
+    public function vnpay_payment(Request $request)
+    {
+        // Xác thực và tìm đơn hàng
+        $order = Order::where('order_code', $request->order_code)->first();
+        if (! $order) {
+            return response()->json(['message' => 'Không tìm thấy đơn hàng'], 404);
+        }
+
+        // Kiểm tra nếu đơn hàng đã thanh toán
+        if ($order->payment_status == '1') {
+            return response()->json(['message' => 'Đơn hàng này đã được thanh toán'], 400);
+        }
+
+        // Cấu hình VNPay
+        $vnp_Url        = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html";
+        $vnp_Returnurl  = $request->return_url;
+        $vnp_TmnCode    = env('VNPAY_TMN_CODE', '6L2C6CQ8');                            // Mã website tại VNPAY
+        $vnp_HashSecret = env('VNPAY_HASH_SECRET', 'PAET5F7FLORDW0TRDKASYARL4M17DUGC'); // Chuỗi bí mật
+
+        // Tạo mã giao dịch duy nhất
+        $vnp_TxnRef     = $order->order_code . '_' . time();
+        $vnp_OrderInfo  = "Thanh toan don hang " . $order->order_code;
+        $vnp_OrderType  = 'billpayment';
+        $vnp_Amount     = $order->final_price * 100; // Số tiền * 100
+        $vnp_Locale     = 'vn';
+        $vnp_IpAddr     = $request->ip(); // IP của người dùng
+        $vnp_CreateDate = date('YmdHis');
+
+        // Tạo payment record
+        $payment                 = $this->createPayment($order, $order->final_price, 'vnpay');
+        $payment->transaction_id = $vnp_TxnRef;
+        $payment->save();
+
+        $inputData = [
+            "vnp_Version"    => "2.1.0",
+            "vnp_TmnCode"    => $vnp_TmnCode,
+            "vnp_Amount"     => $vnp_Amount,
+            "vnp_Command"    => "pay",
+            "vnp_CreateDate" => $vnp_CreateDate,
+            "vnp_CurrCode"   => "VND",
+            "vnp_IpAddr"     => $vnp_IpAddr,
+            "vnp_Locale"     => $vnp_Locale,
+            "vnp_OrderInfo"  => $vnp_OrderInfo,
+            "vnp_OrderType"  => $vnp_OrderType,
+            "vnp_ReturnUrl"  => $vnp_Returnurl,
+            "vnp_TxnRef"     => $vnp_TxnRef,
+        ];
+
+        ksort($inputData);
+        $query    = "";
+        $i        = 0;
+        $hashdata = "";
+        foreach ($inputData as $key => $value) {
+            if ($i == 1) {
+                $hashdata .= '&' . urlencode($key) . "=" . urlencode($value);
+            } else {
+                $hashdata .= urlencode($key) . "=" . urlencode($value);
+                $i = 1;
+            }
+            $query .= urlencode($key) . "=" . urlencode($value) . '&';
+        }
+
+        $vnp_Url = $vnp_Url . "?" . $query;
+        if (isset($vnp_HashSecret)) {
+            $vnpSecureHash = hash_hmac('sha512', $hashdata, $vnp_HashSecret);
+            $vnp_Url .= 'vnp_SecureHash=' . $vnpSecureHash;
+        }
+
+        // Cập nhật payment record với thông tin giao dịch
+        $payment->update([
+            'payment_gateway_response' => json_encode($inputData),
+        ]);
+
+        return response()->json(['payUrl' => $vnp_Url], 200);
+    }
+
+    /**
+     * Xử lý callback từ VNPay
+     */
+    public function vnpay_callback(Request $request)
+    {
+        $vnp_HashSecret = env('VNPAY_HASH_SECRET', 'MKESFZQOZQZQZQZQZQZQZQZQZQZQZQZQ');
+        $inputData      = [];
+        $data           = $request->all();
+
+        foreach ($data as $key => $value) {
+            if (substr($key, 0, 4) == "vnp_") {
+                $inputData[$key] = $value;
+            }
+        }
+
+        $vnp_SecureHash = $inputData['vnp_SecureHash'];
+        unset($inputData['vnp_SecureHash']);
+        ksort($inputData);
+        $i        = 0;
+        $hashData = "";
+        foreach ($inputData as $key => $value) {
+            if ($i == 1) {
+                $hashData .= '&' . urlencode($key) . "=" . urlencode($value);
+            } else {
+                $hashData .= urlencode($key) . "=" . urlencode($value);
+                $i = 1;
+            }
+        }
+
+        $secureHash = hash_hmac('sha512', $hashData, $vnp_HashSecret);
+
+        // Tìm đơn hàng từ mã giao dịch
+        $orderCode = explode('_', $inputData['vnp_TxnRef'])[0];
+        $order     = Order::where('order_code', $orderCode)->first();
+
+        if (! $order) {
+            return redirect()->away(env('FRONTEND_URL') . '/payment/result?status=failure&message=Không tìm thấy đơn hàng');
+        }
+
+        // Tìm payment record
+        $payment = Payment::where('transaction_id', $inputData['vnp_TxnRef'])->first();
+
+        if ($secureHash == $vnp_SecureHash) {
+            if ($inputData['vnp_ResponseCode'] == '00') {
+                // Thanh toán thành công
+                if ($payment) {
+                    $payment->update([
+                        'status'                   => 'completed',
+                        'payment_gateway_response' => json_encode($inputData),
+                    ]);
+                }
+
+                // Cập nhật trạng thái đơn hàng
+                $this->updateOrderPaymentStatus($order);
+
+                return redirect()->away(env('FRONTEND_URL') . '/payment/result?status=success&order_code=' . $orderCode);
+            } else {
+                // Thanh toán thất bại
+                if ($payment) {
+                    $payment->update([
+                        'status'                   => 'failed',
+                        'payment_gateway_response' => json_encode($inputData),
+                    ]);
+                }
+
+                return redirect()->away(env('FRONTEND_URL') . '/payment/result?status=failure&order_code=' . $orderCode);
+            }
+        } else {
+            // Chữ ký không hợp lệ
+            if ($payment) {
+                $payment->update([
+                    'status'                   => 'failed',
+                    'payment_gateway_response' => json_encode($inputData),
+                ]);
+            }
+
+            return redirect()->away(env('FRONTEND_URL') . '/payment/result?status=failure&message=Chữ ký không hợp lệ');
+        }
+    }
+
+    //=============================================== ZALOPAY ================================================
+    /**
+     * Tạo đơn hàng thanh toán ZaloPay
+     */
+    public function zalopay_payment(Request $request)
+    {
+        $order = Order::where('order_code', $request->order_code)->first();
+        if (! $order) {
+            return response()->json(['message' => 'Không tìm thấy đơn hàng'], 404);
+        }
+
+        if ($order->payment_status == '1') {
+            return response()->json(['message' => 'Đơn hàng này đã được thanh toán'], 400);
+        }
+
+        $config = [
+            'app_id'   => env('ZALOPAY_APP_ID', '2553'),
+            'key1'     => env('ZALOPAY_KEY1', 'PcY4iZIKFCIdgZvA6ueMcMHHUbRLYjPL'),
+            'key2'     => env('ZALOPAY_KEY2', 'kLtgPl8HHhfvMuDHPwKfgfsY4Ydm9eIz'),
+            'endpoint' => 'https://sb-openapi.zalopay.vn/v2/create',
+        ];
+
+        $now          = Carbon::now('Asia/Ho_Chi_Minh');
+        $app_trans_id = $now->format('ymd') . '_' . $order->order_code . '_' . round(microtime(true) * 1000);
+
+        $payment                 = $this->createPayment($order, $order->final_price, 'zalopay');
+        $payment->transaction_id = $app_trans_id;
+        $payment->save();
+
+        $embed_data = json_encode([
+            'merchantinfo' => 'embeddata123',
+            'redirecturl'  => $request->return_url,
+        ]);
+
+        $items = json_encode([[
+            'name'     => 'Thanh toan don hang ' . $order->order_code,
+            'price'    => (int) $order->final_price,
+            'quantity' => 1,
+        ]]);
+
+        $order_data = [
+            'app_id'       => $config['app_id'],
+            'app_trans_id' => $app_trans_id,
+            'app_user'     => 'user_123',
+            'app_time'     => round(microtime(true) * 1000),
+            'amount'       => (int) $order->final_price,
+            'item'         => $items,
+            'description'  => 'Thanh toan don hang ' . $order->order_code,
+            'embed_data'   => $embed_data,
+            'bank_code'    => 'zalopayapp',
+            'callback_url' => env('APP_URL') . '/api/v1/payment/zalopay/callback',
+        ];
+
+        $data = $order_data['app_id'] . '|' .
+            $order_data['app_trans_id'] . '|' .
+            $order_data['app_user'] . '|' .
+            $order_data['amount'] . '|' .
+            $order_data['app_time'] . '|' .
+            $order_data['embed_data'] . '|' .
+            $order_data['item'];
+
+        $order_data['mac'] = hash_hmac('sha256', $data, $config['key1']);
+
+        try {
+            $response = Http::asForm()
+                ->post($config['endpoint'], $order_data);
+
+            $jsonResult = $response->json();
+
+            if ($jsonResult['return_code'] == 1) {
+                $payment->update([
+                    'payment_gateway_response' => json_encode($jsonResult),
+                ]);
+
+                return response()->json([
+                    'order_url'   => $jsonResult['order_url'],
+                    'order_token' => $jsonResult['order_token'],
+                ], 200);
+            }
+
+            $payment->update([
+                'status'                   => 'failed',
+                'payment_gateway_response' => json_encode($jsonResult),
+            ]);
+
+            return response()->json([
+                'message' => $jsonResult['return_message'] ?? 'Không thể tạo đơn hàng ZaloPay',
+                'details' => $jsonResult,
+            ], 400);
+
+        } catch (\Exception $e) {
+            $payment->update([
+                'status'                   => 'failed',
+                'payment_gateway_response' => json_encode(['error' => $e->getMessage()]),
+            ]);
+
+            return response()->json([
+                'message' => 'Lỗi khi tạo đơn hàng ZaloPay',
+                'error'   => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Xử lý callback từ ZaloPay
+     */
+    public function zalopay_callback(Request $request)
+    {
+        $key2 = env('ZALOPAY_KEY2', 'kLtgPl8HHhfvMuDHPwKfgfsY4Ydm9eIz');
+
+        try {
+            $data = $request->all();
+            $mac  = $data['mac'];
+            unset($data['mac']);
+
+            // Tạo chuỗi hash để verify
+            $dataStr = '';
+            foreach ($data as $key => $value) {
+                $dataStr .= $key . '=' . $value . '&';
+            }
+            $dataStr   = rtrim($dataStr, '&');
+            $macVerify = hash_hmac('sha256', $dataStr, $key2);
+
+            if ($mac !== $macVerify) {
+                return response()->json(['return_code' => -1, 'return_message' => 'Chữ ký không hợp lệ']);
+            }
+
+                                                                 // Tìm đơn hàng và payment
+            $orderCode = explode('_', $data['app_trans_id'])[1]; // Lấy phần order_code từ app_trans_id
+            $order     = Order::where('order_code', $orderCode)->first();
+            if (! $order) {
+                return response()->json(['return_code' => -1, 'return_message' => 'Không tìm thấy đơn hàng']);
+            }
+
+            $payment = Payment::where('transaction_id', $data['app_trans_id'])->first();
+            if (! $payment) {
+                return response()->json(['return_code' => -1, 'return_message' => 'Không tìm thấy giao dịch thanh toán']);
+            }
+
+            if ($data['status'] == 1) {
+                $payment->update([
+                    'status'                   => 'completed',
+                    'payment_gateway_response' => json_encode($data),
+                ]);
+                $this->updateOrderPaymentStatus($order);
+                return response()->json(['return_code' => 1, 'return_message' => 'success']);
+            }
+
+            $payment->update([
+                'status'                   => 'failed',
+                'payment_gateway_response' => json_encode($data),
+            ]);
+            return response()->json(['return_code' => -1, 'return_message' => 'Thanh toán thất bại']);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'return_code'    => -1,
+                'return_message' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Kiểm tra trạng thái đơn hàng ZaloPay
+     */
+    public function zalopay_check_status(Request $request)
+    {
+        $app_id   = env('ZALOPAY_APP_ID', '2553');
+        $key1     = env('ZALOPAY_KEY1', 'PcY4iZIKFCIdgZvA6ueMcMHHUbRLYjPL');
+        $endpoint = "https://sandbox.zalopay.com.vn/v001/tpe/getstatusbyapptransid";
+
+        $data = [
+            'app_id'       => $app_id,
+            'app_trans_id' => $request->app_trans_id,
+            'mac'          => hash_hmac('sha256', $app_id . '|' . $request->app_trans_id, $key1),
+        ];
+
+        try {
+            $result = $this->execPostRequest($endpoint, json_encode($data));
+            return response()->json(json_decode($result, true));
+        } catch (\Exception $e) {
+            return response()->json([
+                'return_code'    => -1,
+                'return_message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    //=============================================== COD ================================================
     /**
      * Xử lý thanh toán khi giao hàng (COD)
      */
@@ -288,7 +633,7 @@ class PaymentController extends Controller
 
                                       // Cập nhật trạng thái thanh toán và trạng thái đơn hàng
         $order->payment_status = '1'; // Đã thanh toán
-        $order->status         = '3'; // Đã hoàn thành
+        $order->status         = '2'; // Đã hoàn thành
         $order->save();
 
         return response()->json([
@@ -296,4 +641,5 @@ class PaymentController extends Controller
             'order_code' => $order->order_code,
         ], 200);
     }
+
 }

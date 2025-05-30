@@ -46,8 +46,8 @@ class AnalyzeController extends Controller
         $stats = [
             'totalRevenue' => (float) $orders->sum('final_price'),
             'totalOrders' => $orders->count(),
-            'completedOrders' => $orders->where('status', '3')->count(),
-            'pendingOrders' => $orders->whereIn('status', ['0', '1', '2'])->count(),
+            'completedOrders' => $orders->where('status', '2')->count(),
+            'pendingOrders' => $orders->whereIn('status', ['0', '1'])->count(),
             'canceledOrders' => $orders->where('status', '-1')->count(),
             'paymentCOD' => $orders->where('payment_method', 'cod')->count(),
             'paymentMoMo' => $orders->where('payment_method', 'momo')->count(),

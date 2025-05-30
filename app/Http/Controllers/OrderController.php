@@ -66,7 +66,7 @@ class OrderController extends Controller
 
             // Tạo mã đơn hàng duy nhất
             do {
-                $orderCode = 'TCH' . time() . strtoupper(Str::random(6));
+                $orderCode = 'TCS' . time() . strtoupper(Str::random(6));
             } while (Order::where('order_code', $orderCode)->exists());
 
             // Tạo đơn hàng
@@ -119,7 +119,7 @@ class OrderController extends Controller
             DB::commit();
 
             // Gửi event realtime thông báo đơn hàng mới
-            event(new NewOrderEvent($order));
+            //event(new NewOrderEvent($order));
 
             return response()->json([
                 'message'    => 'Đặt hàng thành công',
