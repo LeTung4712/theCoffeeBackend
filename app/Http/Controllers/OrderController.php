@@ -1,11 +1,12 @@
 <?php
 namespace App\Http\Controllers;
 
-use App\Events\NewOrderEvent;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
+use App\Models\Voucher;
+use App\Models\VoucherUsage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -47,13 +48,14 @@ class OrderController extends Controller
         $validator = Validator::make($request->all(), [
             'user_id'                     => 'required|exists:users,id',
             'user_name'                   => 'required|string|max:100',
-            'mobile_no'                   => 'required|string|max:15',
+            'mobile_no'                   => ['required', 'regex:/^0[0-9]{9}$/', 'size:10'],
             'address'                     => 'required|string',
             'payment_method'              => 'required|in:cod,vnpay,momo,zalopay',
             'products'                    => 'required|array|min:1',
             'products.*.product_id'       => 'required|exists:products,id',
             'products.*.product_quantity' => 'required|integer|min:1',
             'products.*.size'             => 'required|in:S,M,L',
+            'voucher_code'                => 'nullable|string', // Thêm validate cho voucher code
         ]);
 
         if ($validator->fails()) {
@@ -64,10 +66,55 @@ class OrderController extends Controller
             // Sử dụng transaction để đảm bảo tính toàn vẹn dữ liệu
             DB::beginTransaction();
 
+            // Xử lý voucher nếu có
+            $discountAmount = 0;
+            $voucher        = null;
+            if ($request->voucher_code) {
+                $voucher = Voucher::where('code', $request->voucher_code)
+                    ->where('active', true)
+                    ->where('expire_at', '>', now())
+                    ->whereRaw('total_quantity > used_quantity')
+                    ->first();
+
+                if (! $voucher) {
+                    throw new \Exception('Mã voucher không hợp lệ hoặc đã hết hạn');
+                }
+
+                // Kiểm tra số lần sử dụng của user
+                $usageCount = VoucherUsage::where('voucher_id', $voucher->id)
+                    ->where('user_id', $request->user_id)
+                    ->count();
+
+                if ($usageCount >= $voucher->limit_per_user) {
+                    throw new \Exception('Bạn đã sử dụng hết số lần cho phép của voucher này');
+                }
+
+                // Kiểm tra giá trị đơn hàng tối thiểu
+                if ($request->total_price < $voucher->min_order_amount) {
+                    throw new \Exception('Giá trị đơn hàng chưa đạt yêu cầu để sử dụng voucher');
+                }
+
+                // Tính toán số tiền giảm giá
+                if ($voucher->discount_type === 'percent') {
+                    $discountAmount = min( //lấy giá trị nhỏ nhất giữa giá trị đơn hàng * phần trăm giảm giá và giá trị giảm tối đa
+                        $request->total_price * ($voucher->discount_percent / 100),
+                        $voucher->max_discount_amount
+                    );
+                } else {
+                    $discountAmount = min( //lấy giá trị nhỏ nhất giữa giá trị voucher và giá trị đơn hàng
+                        $voucher->max_discount_amount,
+                        $request->total_price
+                    );
+                }
+            }
+
             // Tạo mã đơn hàng duy nhất
             do {
                 $orderCode = 'TCS' . time() . strtoupper(Str::random(6));
             } while (Order::where('order_code', $orderCode)->exists());
+
+            // Tính toán giá cuối cùng
+            $finalPrice = $request->total_price - $discountAmount + ($request->shipping_fee ?? 0);
 
             // Tạo đơn hàng
             $order = new Order([
@@ -78,22 +125,29 @@ class OrderController extends Controller
                 'note'            => (string) $request->note ?? '',
                 'shipping_fee'    => (float) $request->shipping_fee ?? 0,
                 'total_price'     => (float) $request->total_price,
-                'discount_amount' => (float) $request->discount_amount ?? 0,
-                'final_price'     => (float) $request->final_price,
+                'discount_amount' => (float) $discountAmount,
+                'final_price'     => (float) $finalPrice,
                 'payment_method'  => (string) $request->payment_method,
                 'payment_status'  => '0', // Chưa thanh toán
                 'status'          => '0', // Chờ xử lý
                 'order_code'      => $orderCode,
             ]);
 
-            // Kiểm tra lại final_price
-            $calculatedFinalPrice = $order->total_price - $order->discount_amount + $order->shipping_fee;
-            if (abs($calculatedFinalPrice - $order->final_price) > 0.01) {
-                throw new \Exception('Tổng tiền đơn hàng không khớp với tính toán');
-            }
-
             // Lưu đơn hàng (một lần duy nhất)
             $order->save();
+
+            // Nếu có sử dụng voucher, tăng số lượng đã sử dụng và tạo bản ghi sử dụng
+            if ($voucher) {
+                // Tăng số lượng đã sử dụng của voucher
+                $voucher->increment('used_quantity');
+
+                // Tạo bản ghi sử dụng voucher
+                VoucherUsage::create([
+                    'voucher_id' => $voucher->id,
+                    'user_id'    => $request->user_id,
+                    'order_id'   => $order->id,
+                ]);
+            }
 
             // Thêm các sản phẩm vào đơn hàng
             foreach ($request->products as $product) {
@@ -179,6 +233,12 @@ class OrderController extends Controller
         if (! $order) {
             return response()->json(['message' => 'Không tìm thấy đơn hàng'], 404);
         }
+
+        // Chỉ cho phép cập nhật nếu đơn hàng đang ở trạng thái "đang giao" (1)
+        if ($order->status != 1) {
+            return response()->json(['message' => 'Chỉ có thể xác nhận giao hàng khi đơn hàng đang ở trạng thái \"đang giao\"!'], 400);
+        }
+
         try {
             $order->status = '2'; // Giao hàng thành công
             $order->save();
@@ -195,6 +255,12 @@ class OrderController extends Controller
         if (! $order) {
             return response()->json(['message' => 'Không tìm thấy đơn hàng'], 404);
         }
+
+        // Kiểm tra trạng thái đơn hàng chỉ có thể hủy nếu đơn hàng đang ở trạng thái "chờ xử lý" (0)
+        if ($order->status == 1 || $order->status == 2) {
+            return response()->json(['message' => 'Đơn hàng đã được xác nhận hoặc đang giao, không thể hủy!'], 400);
+        }
+
         try {
             $order->status = '-1';
             $order->save();

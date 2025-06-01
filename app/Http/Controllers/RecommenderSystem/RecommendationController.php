@@ -220,9 +220,10 @@ class RecommendationController extends Controller
     // Hàm lấy sản phẩm phổ biến
     private function getPopularProducts()
     {
-        $popularProducts = Product::withCount('orderItems')
-            ->orderBy('order_items_count', 'desc')
-            ->take(6)
+        $popularProducts = Product::where('id', 3 )
+            ->orWhere('id', 20)
+            ->orWhere('id', 24)
+            ->orWhere('id', 28)
             ->get();
 
         return response()->json([

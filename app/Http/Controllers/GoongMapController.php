@@ -17,7 +17,7 @@ class GoongMapController extends Controller
 
     public function searchAddress(Request $request)
     {
-        // Rate limiting: 60 requests per minute
+        // Rate limiting: cho phép 60 request/phút
         $executed = RateLimiter::attempt(
             'goong-api:' . $request->ip(),
             $perMinute = 60,
@@ -43,11 +43,24 @@ class GoongMapController extends Controller
         }
 
         // Gọi service để lấy dữ liệu từ Goong API
-        $result = $this->goongMapService->searchAddress($query);
+        $result = $this->goongMapService->autocomplete($query);
+
+        // Chỉ giữ lại description và place_id
+        $filtered = [];
+        if (! empty($result['predictions'])) {
+            foreach ($result['predictions'] as $item) {
+                $filtered[] = [
+                    'description' => $item['description'] ?? '',
+                    'place_id'    => $item['place_id'] ?? '',
+                ];
+            }
+        }
 
         // Cache kết quả trong 1 tháng
-        Cache::put($cacheKey, $result, now()->addMonth());
+        Cache::put($cacheKey, ['predictions' => $filtered], now()->addMonth());
 
-        return response()->json($result);
+        return response()->json([
+            'predictions' => $filtered,
+        ], 200);
     }
 }

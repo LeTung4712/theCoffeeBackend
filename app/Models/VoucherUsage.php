@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -13,10 +12,14 @@ class VoucherUsage extends Model
         'user_id',
     ];
 
-    public function voucher(){
-        return $this->hasOne(Voucher::class, 'id', 'voucher_id');
+    //mỗi voucher có thể được sử dụng bởi nhiều user
+    public function voucher()
+    {
+        return $this->belongsTo(Voucher::class, 'voucher_id', 'id');
     }
-    public function user(){
-        return $this->hasOne(User::class, 'id', 'user_id');
+    //mỗi user có thể sử dụng nhiều voucher
+    public function user()
+    {
+        return $this->belongsTo(User::class, 'user_id', 'id');
     }
 }

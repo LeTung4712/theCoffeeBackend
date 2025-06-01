@@ -14,15 +14,15 @@ class GoongMapService
         $this->apiKey = config('services.goong.api_key');
     }
 
-    public function searchAddress(string $query)
+    public function autocomplete(string $query)
     {
         try {
             // goi api goong để tìm kiếm địa chỉ
             $response = Http::get("{$this->baseUrl}/Place/AutoComplete", [
                 'api_key' => $this->apiKey,
                 'input'   => $query,
-                'location' => '21.007042, 105.842757', // vị trí bk Hà Nội
-                'limit'   => 6, // giới hạn 6 kết quả
+                'location' => '21.007042, 105.842757', // vị trí bk Hà Nội ( ưu tiên tìm kiếm địa chỉ gần đó)
+                'limit'   => 5, // giới hạn 5 kết quả 
             ]);
 
             // nếu thành công thì trả về kết quả    
