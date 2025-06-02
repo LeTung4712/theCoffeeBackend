@@ -14,7 +14,6 @@ class UserController extends Controller
         $user = User::where('id', $request->id)->first();
         $user->update($request->all());
         return response([
-            'error' => false,
             'message' => 'Update info successfully',
             'userInfo' => $user,
         ], 200);
@@ -24,7 +23,6 @@ class UserController extends Controller
     {
         $user = User::all();
         return response([
-            'error' => false,
             'message' => 'Get all user successfully',
             'userInfo' => $user,
         ], 200);

@@ -16,11 +16,16 @@ return new class extends Migration
             $table->string('first_name', 50);
             $table->string('last_name', 50);
             $table->enum('gender', ['male', 'female', 'other']); //Giới tính
-            $table->date('date_of_birth')->nullable(); //Ngày sinh
-            $table->string('mobile_no', 15); //Số điện thoại
-            $table->string('email', 100); //Email
-            $table->boolean('active')->default(true); //Trạng thái
-            $table->rememberToken(); //Token để lưu trữ thông tin đăng nhập
+            $table->date('date_of_birth')->nullable();           //Ngày sinh
+            $table->string('mobile_no', 15);                     //Số điện thoại
+            $table->string('email', 100);                        //Email
+            $table->string('access_token',1000)->nullable();             //Token JWT
+            $table->string('refresh_token',1000)->nullable(); //Token để lưu trữ thông tin đăng nhập
+            $table->timestamp('refresh_token_expired_at')->nullable(); //Thời gian hết hạn của token
+            $table->timestamp('last_login_at')->nullable();      //Thời gian đăng nhập cuối
+            $table->integer('login_attempts')->default(0);       //Số lần đăng nhập sai
+            $table->timestamp('locked_until')->nullable();       //Thời gian khóa tài khoản
+            $table->boolean('is_active')->default(true);         //Trạng thái hoạt động
             $table->timestamps();
         });
     }

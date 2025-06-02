@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Http\Controllers\User;
 
 use App\Http\Controllers\Controller;
@@ -9,24 +8,26 @@ use Illuminate\Http\Request;
 class AddressNoteController extends Controller
 {
     // Lấy ghi chú địa chỉ
-    public function getAddressNote(Request $request){
+    public function getAddressNote(Request $request)
+    {
         $addressNote = AddressNote::where('user_id', $request->user_id)
-                                    ->orderByDesc('id')
-                                    ->get();
-        return $addressNote -> isEmpty() 
-            ? response () -> json(['message' => 'Không có ghi chú địa chỉ'], 404)
-            : response () -> json(['message' => 'Lấy ghi chú địa chỉ thành công', 'address_note' => $addressNote], 200);
+            ->orderByDesc('id')
+            ->get();
+        return $addressNote->isEmpty()
+        ? response()->json(['message' => 'Không có ghi chú địa chỉ'], 404)
+        : response()->json(['message' => 'Lấy ghi chú địa chỉ thành công', 'address_note' => $addressNote], 200);
     }
 
     // Thêm ghi chú địa chỉ
-    public function createAddressNote(Request $request){
+    public function createAddressNote(Request $request)
+    {
         // Giới hạn số lượng ghi chú địa chỉ của user là 4
         if (AddressNote::where('user_id', $request->user_id)->count() >= 4) {
             return response()->json(['message' => 'Số lượng ghi chú địa chỉ của bạn đã đạt giới hạn là 4'], 400);
         }
 
         $addressNote = new AddressNote($request->only([
-            'user_id', 'user_name', 'mobile_no', 'address', 'address_type', 'is_default', 'province_code', 'district_code', 'ward_code'
+            'user_id', 'user_name', 'mobile_no', 'address', 'address_type', 'is_default', 'province_code', 'district_code', 'ward_code',
         ]));
 
         try {
@@ -46,14 +47,15 @@ class AddressNoteController extends Controller
     }
 
     // Cập nhật ghi chú địa chỉ
-    public function updateAddressNote (Request $request){
+    public function updateAddressNote(Request $request)
+    {
         $addressNote = AddressNote::find($request->address_id);
-        if (!$addressNote) {
+        if (! $addressNote) {
             return response()->json(['message' => 'Không tìm thấy ghi chú địa chỉ'], 404);
         }
 
         $addressNote->fill($request->only([
-            'user_name', 'mobile_no', 'address', 'address_type', 'is_default', 'province_code', 'district_code', 'ward_code'
+            'user_name', 'mobile_no', 'address', 'address_type', 'is_default', 'province_code', 'district_code', 'ward_code',
         ]));
 
         try {
@@ -73,7 +75,8 @@ class AddressNoteController extends Controller
     }
 
     // Xóa ghi chú địa chỉ
-    public function deleteAddressNote (Request $request){
+    public function deleteAddressNote(Request $request)
+    {
         $addressNote = AddressNote::where('id', $request->address_id)->first();
         if ($addressNote == null) {
             return response(['message' => 'Không tìm thấy ghi chú địa chỉ'], 404);
