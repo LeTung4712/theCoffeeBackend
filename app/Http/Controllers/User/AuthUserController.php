@@ -17,11 +17,6 @@ class AuthUserController extends Controller
 {
     private const REFRESH_TOKEN_EXPIRY_DAYS = 7; // Thời hạn refresh token là 7 ngày
 
-    public function __construct()
-    {
-        $this->middleware('auth:api', ['except' => ['login', 'checkOtp', 'refreshToken']]);
-    }
-
     //đăng nhập
     public function login(Request $request)
     {
@@ -29,6 +24,7 @@ class AuthUserController extends Controller
         $key = 'login:' . $request->ip();
         if (RateLimiter::tooManyAttempts($key, 5)) {
             return response([
+                'status'      => false,
                 'message'     => 'Quá nhiều yêu cầu đăng nhập. Vui lòng thử lại sau.',
                 'retry_after' => RateLimiter::availableIn($key),
             ], 429);
@@ -41,6 +37,7 @@ class AuthUserController extends Controller
 
         if ($validator->fails()) {
             return response([
+                'status'  => false,
                 'message' => 'Số điện thoại không hợp lệ',
             ], 422);
         }
@@ -50,6 +47,7 @@ class AuthUserController extends Controller
         // Kiểm tra tài khoản có bị khóa không
         if ($user && $user->isLocked()) {
             return response([
+                'status'  => false,
                 'message' => 'Tài khoản đã bị khóa. Vui lòng thử lại sau ' . $user->locked_until->diffForHumans(),
             ], 403);
         }
@@ -64,6 +62,7 @@ class AuthUserController extends Controller
             if (! $user) {
                 Log::error('Không thể tạo user mới', ['mobile_no' => $request->mobile_no]);
                 return response([
+                    'status'  => false,
                     'message' => 'Đăng nhập thất bại',
                 ], 500);
             }
@@ -74,12 +73,14 @@ class AuthUserController extends Controller
         if ($sendOtp) {
             Log::info('OTP đã được gửi', ['user_id' => $user->id]);
             return response([
+                'status'  => true,
                 'message' => 'OTP đã được gửi thành công',
-                'sendOtp' => $sendOtp,
+                //'sendOtp'     => $sendOtp,
             ], 200);
         } else {
             Log::error('Gửi OTP thất bại', ['user_id' => $user->id]);
             return response([
+                'status'  => false,
                 'message' => 'Gửi OTP thất bại',
             ], 500);
         }
@@ -141,6 +142,7 @@ class AuthUserController extends Controller
 
         if ($validator->fails()) {
             return response([
+                'status'  => false,
                 'message' => 'Dữ liệu không hợp lệ',
             ], 422);
         }
@@ -149,6 +151,7 @@ class AuthUserController extends Controller
         $user = User::where('mobile_no', $request->mobile_no)->first();
         if (! $user) {
             return response([
+                'status'  => false,
                 'message' => 'Không tìm thấy người dùng',
             ], 404);
         }
@@ -156,6 +159,7 @@ class AuthUserController extends Controller
         // Kiểm tra tài khoản có bị khóa không
         if ($user->isLocked()) {
             return response([
+                'status'  => false,
                 'message' => 'Tài khoản đã bị khóa. Vui lòng thử lại sau ' . $user->locked_until->diffForHumans(),
             ], 403);
         }
@@ -169,6 +173,7 @@ class AuthUserController extends Controller
         if (! $verificationCode) {
             $user->incrementLoginAttempts();
             return response([
+                'status'  => false,
                 'message' => 'Mã OTP không hợp lệ',
             ], 400);
         }
@@ -177,12 +182,14 @@ class AuthUserController extends Controller
         if (strcmp($verificationCode->otp, $request->otp) != 0) {
             $user->incrementLoginAttempts();
             return response([
+                'status'  => false,
                 'message' => 'Mã OTP không chính xác',
             ], 400);
         }
 
         if ($now->isAfter($verificationCode->expire_at)) {
             return response([
+                'status'  => false,
                 'message' => 'Mã OTP đã hết hạn',
             ], 400);
         }
@@ -207,36 +214,55 @@ class AuthUserController extends Controller
         Log::info('Đăng nhập thành công', ['user_id' => $user->id]);
 
         return response([
-            'message'                  => 'Đăng nhập thành công',
-            'userInfo'                 => $user,
-            'access_token'             => $token,
-            'refresh_token'            => $refreshToken,
-            'token_type'               => 'bearer',
-            'expires_in'               => config('jwt.ttl') * 60,
-            'refresh_token_expires_in' => self::REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60,
+            'status'  => true,
+            'message' => 'Đăng nhập thành công',
+            'data'    => [
+                'userInfo'                 => $user,
+                'access_token'             => $token,
+                'refresh_token'            => $refreshToken,
+                'token_type'               => 'bearer',
+                'expires_in'               => config('jwt.ttl') * 60,
+                'refresh_token_expires_in' => self::REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60,
+            ],
         ], 200);
     }
+
     //đăng xuất
     public function logout()
     {
         try {
+            // Lấy user từ JWT token hiện tại
             $user = auth()->user();
-            // Xóa cả JWT token và refresh token
+
+            if (! $user) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'Không tìm thấy thông tin người dùng',
+                ], 401);
+            }
+
+            // Xóa tokens
             $user->update([
                 'access_token'             => null,
                 'refresh_token'            => null,
                 'refresh_token_expired_at' => null,
             ]);
+
+            // Logout khỏi JWT và trả về JSON response
             auth()->logout();
 
-            Log::info('Đăng xuất thành công', ['user_id' => $user->id]);
-
-            return response([
+            return response()->json([
+                'status'  => true,
                 'message' => 'Đăng xuất thành công',
             ], 200);
+
         } catch (\Exception $e) {
-            Log::error('Lỗi đăng xuất', ['error' => $e->getMessage()]);
-            return response([
+            Log::error('Lỗi đăng xuất', [
+                'error'   => $e->getMessage(),
+                'user_id' => auth()->id() ?? 'unknown',
+            ]);
+            return response()->json([
+                'status'  => false,
                 'message' => 'Đăng xuất thất bại',
             ], 500);
         }
@@ -252,6 +278,7 @@ class AuthUserController extends Controller
 
             if ($validator->fails()) {
                 return response([
+                    'status'  => false,
                     'message' => 'Refresh token không hợp lệ',
                 ], 422);
             }
@@ -262,6 +289,7 @@ class AuthUserController extends Controller
 
             if (! $user) {
                 return response([
+                    'status'  => false,
                     'message' => 'Refresh token không hợp lệ hoặc đã hết hạn',
                 ], 401);
             }
@@ -277,14 +305,19 @@ class AuthUserController extends Controller
             Log::info('Refresh token thành công', ['user_id' => $user->id]);
 
             return response([
-                'access_token' => $token,
-                'token_type'   => 'bearer',
-                'expires_in'   => config('jwt.ttl') * 60,
+                'status'       => true,
+                'message'      => 'Refresh token thành công',
+                'data'         => [
+                    'access_token' => $token,
+                    'token_type'   => 'bearer',
+                    'expires_in'   => config('jwt.ttl') * 60,
+                ],
             ], 200);
 
         } catch (\Exception $e) {
             Log::error('Lỗi refresh token', ['error' => $e->getMessage()]);
             return response([
+                'status'  => false,
                 'message' => 'Không thể refresh token',
             ], 401);
         }

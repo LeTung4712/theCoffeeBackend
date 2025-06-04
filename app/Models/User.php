@@ -55,16 +55,17 @@ class User extends Authenticatable implements JWTSubject
     // hàm này lấy id của user để tạo token
     public function getJWTIdentifier()
     {
-        return $this->getKey(); 
+        return $this->getKey();
     }
 
-    // hàm này lấy thông tin user để tạo token
+    // Thêm type vào token
     public function getJWTCustomClaims()
     {
         return [
-            'mobile_no' => $this->mobile_no,
+            'type'       => 'user',
+            'mobile_no'  => $this->mobile_no,
             'first_name' => $this->first_name,
-            'last_name' => $this->last_name,
+            'last_name'  => $this->last_name,
         ];
     }
 

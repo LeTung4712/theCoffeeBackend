@@ -43,12 +43,12 @@ class Kernel extends HttpKernel
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
         ],
 
-        'admin' => [                                              //middleware admin
-            \Illuminate\Routing\Middleware\SubstituteBindings::class, //middleware này sẽ thay thế các tham số trên route bằng các tham số tương ứng trong request
-            \Illuminate\Routing\Middleware\ThrottleRequests::class,   //middleware này sẽ giới hạn số lần request tới route
+        'admin' => [
+            \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            \Illuminate\Routing\Middleware\ThrottleRequests::class,
         ],
 
-        'user'  => [ // middleware cho user
+        'user'  => [
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
             \Illuminate\Routing\Middleware\ThrottleRequests::class,
         ],
@@ -62,16 +62,18 @@ class Kernel extends HttpKernel
      * @var array<string, class-string|string>
      */
     protected $middlewareAliases = [
-        'auth'             => \App\Http\Middleware\Authenticate::class,
-        'auth.basic'       => \Illuminate\Auth\Middleware\AuthenticateWithBasicAuth::class,
-        'auth.session'     => \Illuminate\Session\Middleware\AuthenticateSession::class,
-        'auth.api'         => \PHPOpenSourceSaver\JWTAuth\Http\Middleware\Authenticate::class,
-        'cache.headers'    => \Illuminate\Http\Middleware\SetCacheHeaders::class,
-        'can'              => \Illuminate\Auth\Middleware\Authorize::class,
-        'guest'            => \App\Http\Middleware\RedirectIfAuthenticated::class,
-        'password.confirm' => \Illuminate\Auth\Middleware\RequirePassword::class,
-        'signed'           => \App\Http\Middleware\ValidateSignature::class,
-        'throttle'         => \Illuminate\Routing\Middleware\ThrottleRequests::class,
-        'verified'         => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
+        'auth'              => \App\Http\Middleware\Authenticate::class,
+        'auth.basic'        => \Illuminate\Auth\Middleware\AuthenticateWithBasicAuth::class,
+        'auth.session'      => \Illuminate\Session\Middleware\AuthenticateSession::class,
+        'auth.user'         => \PHPOpenSourceSaver\JWTAuth\Http\Middleware\Authenticate::class,
+        'auth.admin'        => \App\Http\Middleware\AdminMiddleware::class,
+        'check.order.owner' => \App\Http\Middleware\CheckOrderOwner::class,
+        'cache.headers'     => \Illuminate\Http\Middleware\SetCacheHeaders::class,
+        'can'               => \Illuminate\Auth\Middleware\Authorize::class,
+        'guest'             => \App\Http\Middleware\RedirectIfAuthenticated::class,
+        'password.confirm'  => \Illuminate\Auth\Middleware\RequirePassword::class,
+        'signed'            => \App\Http\Middleware\ValidateSignature::class,
+        'throttle'          => \Illuminate\Routing\Middleware\ThrottleRequests::class,
+        'verified'          => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
     ];
 }

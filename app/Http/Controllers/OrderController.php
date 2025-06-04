@@ -5,8 +5,10 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
+use App\Models\Topping;
 use App\Models\Voucher;
 use App\Models\VoucherUsage;
+use App\Traits\JWTAuthTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -14,39 +16,21 @@ use Illuminate\Support\Str;
 
 class OrderController extends Controller
 {
-    public function __construct()
-    {
-        $this->middleware('auth:admin',
-            [
-                'except' =>
-                [
-                    'addOrder',
-                    'getOrderHistory',
-                    'getOrderInfo',
-                    'paidOrder',
-                    'startDelivery',
-                    'successOrder',
-                    'cancelOrder',
-                    'getSuccessOrders',
-                    'getPendingPaymentOrders',
-                    'getPendingDeliveryOrders',
-                    'getDeliveringOrders',
-                ],
-            ]
-        );
-        if (! auth('admin')->check()) { //
-            return response()->json([
-                'message' => 'Unauthorized',
-            ], 401);
-        }
-    }
+    use JWTAuthTrait;
 
     //them don hang
     public function addOrder(Request $request)
     {
+        // Kiểm tra xem có phải là user không
+        $authCheck = $this->checkUserAuth();
+        if ($authCheck !== true) {
+            return $authCheck;
+        }
+
+        $user = $this->getJWTAuthInfo()['user'];
+
         // Validate dữ liệu đầu vào
         $validator = Validator::make($request->all(), [
-            'user_id'                     => 'required|exists:users,id',
             'user_name'                   => 'required|string|max:100',
             'mobile_no'                   => ['required', 'regex:/^0[0-9]{9}$/', 'size:10'],
             'address'                     => 'required|string',
@@ -55,16 +39,60 @@ class OrderController extends Controller
             'products.*.product_id'       => 'required|exists:products,id',
             'products.*.product_quantity' => 'required|integer|min:1',
             'products.*.size'             => 'required|in:S,M,L',
-            'voucher_code'                => 'nullable|string', // Thêm validate cho voucher code
+            'voucher_code'                => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
-            return response()->json(['message' => 'Dữ liệu không hợp lệ', 'errors' => $validator->errors()], 422);
+            return response()->json([
+                'status'  => false,
+                'message' => 'Dữ liệu không hợp lệ',
+                'errors'  => $validator->errors(),
+            ], 422);
         }
 
         try {
             // Sử dụng transaction để đảm bảo tính toàn vẹn dữ liệu
             DB::beginTransaction();
+
+            // Tính toán tổng giá trị đơn hàng
+            $totalPrice = 0;
+            $orderItems = [];
+
+            foreach ($request->products as $product) {
+                $productInfo = Product::findOrFail($product['product_id']);
+
+                // Tính giá sản phẩm theo size
+                $productPrice = $productInfo->price;
+                if ($product['size'] === 'M') {
+                    $productPrice += 5000;
+                } else if ($product['size'] === 'L') {
+                    $productPrice += 10000;
+                }
+
+                // Tính giá topping nếu có
+                $toppingPrice = 0;
+                if (! empty($product['topping_items'])) {
+                    foreach ($product['topping_items'] as $topping) {
+                        $toppingInfo = Topping::findOrFail($topping['id']);
+                        $toppingPrice += $toppingInfo->price;
+                    }
+                }
+
+                // Tính tổng giá cho sản phẩm này
+                $itemTotal = ($productPrice + $toppingPrice) * $product['product_quantity'];
+                $totalPrice += $itemTotal;
+
+                // Lưu thông tin sản phẩm để tạo order items sau
+                $orderItems[] = [
+                    'product_id'       => $product['product_id'],
+                    'product_name'     => $productInfo->name,
+                    'product_price'    => $productPrice,
+                    'product_quantity' => $product['product_quantity'],
+                    'topping_items'    => $product['topping_items'] ?? [],
+                    'size'             => $product['size'],
+                    'item_note'        => $product['item_note'] ?? '',
+                ];
+            }
 
             // Xử lý voucher nếu có
             $discountAmount = 0;
@@ -82,7 +110,7 @@ class OrderController extends Controller
 
                 // Kiểm tra số lần sử dụng của user
                 $usageCount = VoucherUsage::where('voucher_id', $voucher->id)
-                    ->where('user_id', $request->user_id)
+                    ->where('user_id', $user->id) // Sửa lại user_id
                     ->count();
 
                 if ($usageCount >= $voucher->limit_per_user) {
@@ -90,53 +118,51 @@ class OrderController extends Controller
                 }
 
                 // Kiểm tra giá trị đơn hàng tối thiểu
-                if ($request->total_price < $voucher->min_order_amount) {
+                if ($totalPrice < $voucher->min_order_amount) {
                     throw new \Exception('Giá trị đơn hàng chưa đạt yêu cầu để sử dụng voucher');
                 }
 
                 // Tính toán số tiền giảm giá
                 if ($voucher->discount_type === 'percent') {
-                    $discountAmount = min( //lấy giá trị nhỏ nhất giữa giá trị đơn hàng * phần trăm giảm giá và giá trị giảm tối đa
-                        $request->total_price * ($voucher->discount_percent / 100),
+                    $discountAmount = min(
+                        $totalPrice * ($voucher->discount_percent / 100),
                         $voucher->max_discount_amount
                     );
                 } else {
-                    $discountAmount = min( //lấy giá trị nhỏ nhất giữa giá trị voucher và giá trị đơn hàng
+                    $discountAmount = min(
                         $voucher->max_discount_amount,
-                        $request->total_price
+                        $totalPrice
                     );
                 }
             }
 
             // Tạo mã đơn hàng duy nhất
             do {
-                $orderCode = 'TCS' . time() . strtoupper(Str::random(6));
+                $orderCode = 'TCS' . $user->id . time() . strtoupper(Str::random(6));
             } while (Order::where('order_code', $orderCode)->exists());
 
             // Tính toán giá cuối cùng
-            $finalPrice = $request->total_price - $discountAmount + ($request->shipping_fee ?? 0);
+            $shippingFee = $request->shipping_fee ?? 0;
+            $finalPrice  = $totalPrice - $discountAmount + $shippingFee;
 
             // Tạo đơn hàng
-            $order = new Order([
-                'user_id'         => (int) $request->user_id,
-                'user_name'       => (string) $request->user_name,
-                'mobile_no'       => (string) $request->mobile_no,
-                'address'         => (string) $request->address,
-                'note'            => (string) $request->note ?? '',
-                'shipping_fee'    => (float) $request->shipping_fee ?? 0,
-                'total_price'     => (float) $request->total_price,
-                'discount_amount' => (float) $discountAmount,
-                'final_price'     => (float) $finalPrice,
-                'payment_method'  => (string) $request->payment_method,
-                'payment_status'  => '0', // Chưa thanh toán
-                'status'          => '0', // Chờ xử lý
+            $order = Order::create([
+                'user_id'         => $user->id,
+                'user_name'       => $request->user_name,
+                'mobile_no'       => $request->mobile_no,
+                'address'         => $request->address,
+                'note'            => $request->note ?? '',
+                'shipping_fee'    => $shippingFee,
+                'total_price'     => $totalPrice,
+                'discount_amount' => $discountAmount,
+                'final_price'     => $finalPrice,
+                'payment_method'  => $request->payment_method,
+                'payment_status'  => '0',
+                'status'          => '0',
                 'order_code'      => $orderCode,
             ]);
 
-            // Lưu đơn hàng (một lần duy nhất)
-            $order->save();
-
-            // Nếu có sử dụng voucher, tăng số lượng đã sử dụng và tạo bản ghi sử dụng
+            // Nếu có sử dụng voucher
             if ($voucher) {
                 // Tăng số lượng đã sử dụng của voucher
                 $voucher->increment('used_quantity');
@@ -144,28 +170,22 @@ class OrderController extends Controller
                 // Tạo bản ghi sử dụng voucher
                 VoucherUsage::create([
                     'voucher_id' => $voucher->id,
-                    'user_id'    => $request->user_id,
+                    'user_id'    => $user->id,
                     'order_id'   => $order->id,
                 ]);
             }
 
             // Thêm các sản phẩm vào đơn hàng
-            foreach ($request->products as $product) {
-                // Kiểm tra sản phẩm tồn tại
-                $productInfo = Product::find($product['product_id']);
-                if (! $productInfo) {
-                    throw new \Exception('Sản phẩm không tồn tại: ' . $product['product_id']);
-                }
-
+            foreach ($orderItems as $item) {
                 OrderItem::create([
                     'order_id'         => $order->id,
-                    'product_id'       => (int) $product['product_id'],
-                    'product_name'     => (string) $product['product_name'] ?? $productInfo->name,
-                    'product_price'    => (float) $product['product_price'] ?? $productInfo->price,
-                    'product_quantity' => (int) $product['product_quantity'],
-                    'topping_items'    => json_encode($product['topping_items'] ?? []),
-                    'size'             => (string) $product['size'],
-                    'item_note'        => (string) $product['item_note'] ?? '',
+                    'product_id'       => $item['product_id'],
+                    'product_name'     => $item['product_name'],
+                    'product_price'    => $item['product_price'],
+                    'product_quantity' => $item['product_quantity'],
+                    'topping_items'    => json_encode($item['topping_items']),
+                    'size'             => $item['size'],
+                    'item_note'        => $item['item_note'],
                 ]);
             }
 
@@ -176,16 +196,19 @@ class OrderController extends Controller
             //event(new NewOrderEvent($order));
 
             return response()->json([
-                'message'    => 'Đặt hàng thành công',
-                'order_code' => $order->order_code,
+                'status'  => true,
+                'message' => 'Đặt hàng thành công',
+                'data'    => [
+                    'order_code' => $order->order_code,
+                ],
             ], 200);
         } catch (\Exception $err) {
             // Nếu có lỗi, rollback tất cả thay đổi
+            \Log::error('Lỗi khi đặt hàng: ' . $err->getMessage());
             DB::rollBack();
             return response()->json([
-                'message'    => 'Đặt hàng thất bại',
-                'error'      => $err->getMessage(),
-                'order_code' => null,
+                'status'  => false,
+                'message' => 'Đặt hàng thất bại',
             ], 400);
         }
     }
@@ -207,73 +230,213 @@ class OrderController extends Controller
     }
 
     //đơn hàng đang giao
-    public function startDelivery(Request $request)
+    public function startDelivery($id)
     {
-        $order = Order::where('id', $request->order_id)->first();
+        $order = Order::where('id', $id)->first();
         if (! $order) {
-            return response()->json(['message' => 'Không tìm thấy đơn hàng'], 404);
+            return response()->json([
+                'status'  => false,
+                'message' => 'Không tìm thấy đơn hàng',
+            ], 404);
         }
         // Kiểm tra xem đơn hàng đã thanh toán chưa
         if ($order->payment_status === '0' && $order->payment_method !== 'cod') {
-            return response()->json(['message' => 'Không thể giao hàng vì đơn hàng chưa thanh toán'], 400);
+            \Log::error('Lỗi khi cập nhật trạng thái đơn hàng #' . $id . ': Đơn hàng chưa thanh toán');
+            return response()->json([
+                'status'  => false,
+                'message' => 'Không thể giao hàng vì đơn hàng chưa thanh toán',
+            ], 400);
         }
         try {
             $order->status = '1'; // Đang giao hàng
             $order->save();
-            return response()->json(['message' => 'Cập nhật trạng thái đơn hàng thành công'], 200);
+            return response()->json([
+                'status'  => true,
+                'message' => 'Cập nhật trạng thái đơn hàng thành công',
+                'data'    => [
+                    'order_code' => $order->order_code,
+                ],
+            ], 200);
         } catch (\Exception $e) {
-            return response()->json(['message' => 'Cập nhật trạng thái đơn hàng thất bại', 'error' => $e->getMessage()], 400);
+            \Log::error('Lỗi khi cập nhật trạng thái đơn hàng #' . $id . ': ' . $e->getMessage());
+            return response()->json([
+                'status'  => false,
+                'message' => 'Cập nhật trạng thái đơn hàng thất bại',
+            ], 400);
         }
     }
 
-    //đơn hàng đã giao thành công
-    public function successOrder(Request $request)
+    /**
+     * Xác nhận giao hàng/nhận hàng thành công
+     */
+    public function successOrder($order_id)
     {
-        $order = Order::where('id', $request->order_id)->first();
-        if (! $order) {
-            return response()->json(['message' => 'Không tìm thấy đơn hàng'], 404);
+        // Kiểm tra xác thực cho cả admin và user
+        $authInfo = $this->getJWTAuthInfo();
+        $user     = $authInfo['user'];
+        $isAdmin  = $authInfo['payload']->get('type') === 'admin';
+
+        // Nếu không phải admin thì kiểm tra quyền user
+        if (! $isAdmin) {
+            $authCheck = $this->checkUserAuth();
+            if ($authCheck !== true) {
+                return $authCheck;
+            }
         }
 
-        // Chỉ cho phép cập nhật nếu đơn hàng đang ở trạng thái "đang giao" (1)
-        if ($order->status != 1) {
-            return response()->json(['message' => 'Chỉ có thể xác nhận giao hàng khi đơn hàng đang ở trạng thái \"đang giao\"!'], 400);
+        $order = Order::find($order_id);
+        if (! $order) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Không tìm thấy đơn hàng',
+            ], 404);
+        }
+
+        // Nếu là user thông thường, kiểm tra quyền sở hữu
+        if (! $isAdmin) {
+            $ownershipCheck = $this->checkResourceOwnership(
+                $order,
+                'Bạn không có quyền cập nhật đơn hàng này'
+            );
+            if ($ownershipCheck !== true) {
+                return $ownershipCheck;
+            }
+        }
+
+        // Kiểm tra trạng thái đơn hàng
+        if ($order->status !== '1') {
+            \Log::error('Lỗi khi cập nhật đơn hàng #' . $order_id . ': Đơn hàng không ở trạng thái "đang giao"');
+            return response()->json([
+                'status'  => false,
+                'message' => 'Chỉ có thể xác nhận giao hàng khi đơn hàng đang ở trạng thái "đang giao"',
+            ], 400);
         }
 
         try {
+            DB::beginTransaction();
+
             $order->status = '2'; // Giao hàng thành công
             $order->save();
-            return response()->json(['message' => 'Cập nhật trạng thái đơn hàng thành công'], 200);
+
+            DB::commit();
+            return response()->json([
+                'status'  => true,
+                'message' => $isAdmin ? 'Xác nhận giao hàng thành công' : 'Xác nhận nhận hàng thành công',
+                'data'    => [
+                    'order_code' => $order->order_code,
+                ],
+            ], 200);
+
         } catch (\Exception $e) {
-            return response()->json(['message' => 'Cập nhật trạng thái đơn hàng thất bại', 'error' => $e->getMessage()], 400);
+            DB::rollBack();
+            \Log::error('Lỗi khi xác nhận giao hàng đơn #' . $order_id . ': ' . $e->getMessage());
+            return response()->json([
+                'status'  => false,
+                'message' => $isAdmin ? 'Xác nhận giao hàng thất bại' : 'Xác nhận nhận hàng thất bại',
+            ], 400);
         }
     }
 
-    //huy don hang
-    public function cancelOrder(Request $request)
+    /**
+     * Hủy đơn hàng
+     */
+    public function cancelOrder($order_id)
     {
-        $order = Order::where('id', $request->order_id)->first();
-        if (! $order) {
-            return response()->json(['message' => 'Không tìm thấy đơn hàng'], 404);
+        // Kiểm tra xác thực cho cả admin và user
+        $authInfo = $this->getJWTAuthInfo();
+        $user     = $authInfo['user'];
+        $isAdmin  = $authInfo['payload']->get('type') === 'admin';
+
+        // Nếu không phải admin thì kiểm tra quyền user
+        if (! $isAdmin) {
+            $authCheck = $this->checkUserAuth();
+            if ($authCheck !== true) {
+                return $authCheck;
+            }
         }
 
-        // Kiểm tra trạng thái đơn hàng chỉ có thể hủy nếu đơn hàng đang ở trạng thái "chờ xử lý" (0)
-        if ($order->status == 1 || $order->status == 2) {
-            return response()->json(['message' => 'Đơn hàng đã được xác nhận hoặc đang giao, không thể hủy!'], 400);
+        $order = Order::find($order_id);
+        if (! $order) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Không tìm thấy đơn hàng',
+            ], 404);
+        }
+
+        // Nếu là user thông thường, kiểm tra quyền sở hữu
+        if (! $isAdmin) {
+            $ownershipCheck = $this->checkResourceOwnership(
+                $order,
+                'Bạn không có quyền hủy đơn hàng này'
+            );
+            if ($ownershipCheck !== true) {
+                return $ownershipCheck;
+            }
+
+            // Kiểm tra trạng thái đơn hàng (chỉ áp dụng cho user)
+            if ($order->status !== '0') {
+                \Log::error('Lỗi khi hủy đơn hàng #' . $order_id . ': Đơn hàng không ở trạng thái "chờ xử lý"');
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'Chỉ có thể hủy đơn hàng khi đang ở trạng thái "chờ xử lý"',
+                ], 400);
+            }
+
+            // Kiểm tra phương thức thanh toán (chỉ áp dụng cho user)
+            if ($order->payment_method !== 'cod' && $order->payment_status === '1') {
+                \Log::error('Lỗi khi hủy đơn hàng #' . $order_id . ': Đơn hàng đã thanh toán');
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'Không thể hủy đơn hàng đã thanh toán',
+                ], 400);
+            }
         }
 
         try {
-            $order->status = '-1';
+            DB::beginTransaction();
+
+            $order->status = '-1'; // Hủy đơn hàng
             $order->save();
-            return response()->json(['message' => 'Cập nhật trạng thái đơn hàng thành công'], 200);
+
+            // Nếu có sử dụng voucher, hoàn trả số lượng đã sử dụng
+            if ($order->voucher_id) {
+                $voucher = Voucher::find($order->voucher_id);
+                if ($voucher) {
+                    $voucher->decrement('used_quantity');
+                    // Xóa bản ghi sử dụng voucher
+                    VoucherUsage::where('order_id', $order->id)->delete();
+                }
+            }
+
+            DB::commit();
+            return response()->json([
+                'status'  => true,
+                'message' => 'Hủy đơn hàng thành công',
+                'data'    => [
+                    'order_code' => $order->order_code,
+                ],
+            ], 200);
+
         } catch (\Exception $e) {
-            return response()->json(['message' => 'Cập nhật trạng thái đơn hàng thất bại', 'error' => $e->getMessage()], 400);
+            DB::rollBack();
+            \Log::error('Lỗi khi hủy đơn hàng #' . $order_id . ': ' . $e->getMessage());
+            return response()->json([
+                'status'  => false,
+                'message' => 'Hủy đơn hàng thất bại',
+            ], 400);
         }
     }
 
     //xem cac don hang cua user
-    public function getOrderHistory(Request $request)
+    public function getOrderHistory()
     {
-        $orders = Order::where('user_id', $request->user_id)
+        $authCheck = $this->checkUserAuth();
+        if ($authCheck !== true) {
+            return $authCheck;
+        }
+
+        $user   = $this->getJWTAuthInfo()['user'];
+        $orders = Order::where('user_id', $user->id)
             ->orderby('id', 'desc')
             ->with('orderItems') // dùng eager loading để lấy thông tin chi tiết của đơn hàng
             ->get();
@@ -292,16 +455,28 @@ class OrderController extends Controller
         }
 
         return $orders->isEmpty()
-        ? response()->json(['message' => 'Không có lịch sử đơn hàng'], 404)
-        : response()->json(['message' => 'Lấy lịch sử đơn hàng thành công', 'orders' => $orders], 200);
+        ? response()->json([
+            'status'  => false,
+            'message' => 'Không có lịch sử đơn hàng',
+        ], 404)
+        : response()->json([
+            'status'  => true,
+            'message' => 'Lấy lịch sử đơn hàng thành công',
+            'data'    => [
+                'orders' => $orders,
+            ],
+        ], 200);
     }
 
     //lay thong tin don hang theo id
-    public function getOrderInfo(Request $request)
+    public function getOrderInfo($id)
     {
-        $order = Order::where('order_code', $request->order_code)->with('orderItems')->first();
+        $order = Order::where('id', $id)->with('orderItems')->first();
         if (! $order) {
-            return response()->json(['message' => 'Không tìm thấy đơn hàng'], 404);
+            return response()->json([
+                'status'  => false,
+                'message' => 'Không tìm thấy đơn hàng',
+            ], 404);
         }
 
         // Chuyển đổi topping_items từ chuỗi JSON thành mảng
@@ -315,9 +490,13 @@ class OrderController extends Controller
         $order->shipping_fee    = (float) $order->shipping_fee;
         $order->final_price     = (float) $order->final_price;
 
-        return $order
-        ? response()->json(['message' => 'Lấy thông tin đơn hàng thành công', 'order' => $order], 200)
-        : response()->json(['message' => 'Không tìm thấy đơn hàng'], 404);
+        return response()->json([
+            'status'  => true,
+            'message' => 'Lấy thông tin đơn hàng thành công',
+            'data'    => [
+                'order' => $order,
+            ],
+        ], 200);
     }
 
     //lay don hang hoan thanh
@@ -342,8 +521,17 @@ class OrderController extends Controller
             $order->final_price     = (float) $order->final_price;
         }
         return $orders->isEmpty()
-        ? response()->json(['message' => 'Không tìm thấy đơn hàng'], 404)
-        : response()->json(['message' => 'Lấy thông tin đơn hàng thành công', 'orders' => $orders], 200);
+        ? response()->json([
+            'status'  => false,
+            'message' => 'Không tìm thấy đơn hàng',
+        ], 404)
+        : response()->json([
+            'status'  => true,
+            'message' => 'Lấy thông tin đơn hàng thành công',
+            'data'    => [
+                'orders' => $orders,
+            ],
+        ], 200);
     }
 
     // Lấy đơn hàng chờ thanh toán online
@@ -368,8 +556,17 @@ class OrderController extends Controller
         }
 
         return $orders->isEmpty()
-        ? response()->json(['message' => 'Không có đơn hàng chờ thanh toán'], 404)
-        : response()->json(['message' => 'Lấy danh sách đơn hàng chờ thanh toán thành công', 'orders' => $orders], 200);
+        ? response()->json([
+            'status'  => false,
+            'message' => 'Không có đơn hàng chờ thanh toán',
+        ], 404)
+        : response()->json([
+            'status'  => true,
+            'message' => 'Lấy danh sách đơn hàng chờ thanh toán thành công',
+            'data'    => [
+                'orders' => $orders,
+            ],
+        ], 200);
     }
 
     // Lấy đơn hàng chờ giao (COD và đã thanh toán online)
@@ -396,8 +593,17 @@ class OrderController extends Controller
         }
 
         return $orders->isEmpty()
-        ? response()->json(['message' => 'Không có đơn hàng chờ giao'], 404)
-        : response()->json(['message' => 'Lấy danh sách đơn hàng chờ giao thành công', 'orders' => $orders], 200);
+        ? response()->json([
+            'status'  => false,
+            'message' => 'Không có đơn hàng chờ giao',
+        ], 404)
+        : response()->json([
+            'status'  => true,
+            'message' => 'Lấy danh sách đơn hàng chờ giao thành công',
+            'data'    => [
+                'orders' => $orders,
+            ],
+        ], 200);
     }
 
     // Lấy đơn hàng đang giao
@@ -420,7 +626,16 @@ class OrderController extends Controller
         }
 
         return $orders->isEmpty()
-        ? response()->json(['message' => 'Không có đơn hàng đang giao'], 404)
-        : response()->json(['message' => 'Lấy danh sách đơn hàng đang giao thành công', 'orders' => $orders], 200);
+        ? response()->json([
+            'status'  => false,
+            'message' => 'Không có đơn hàng đang giao',
+        ], 404)
+        : response()->json([
+            'status'  => true,
+            'message' => 'Lấy danh sách đơn hàng đang giao thành công',
+            'data'    => [
+                'orders' => $orders,
+            ],
+        ], 200);
     }
 }

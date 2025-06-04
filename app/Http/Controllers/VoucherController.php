@@ -5,21 +5,11 @@ use App\Http\Controllers\Controller;
 use App\Models\Voucher;
 use App\Models\VoucherUsage;
 use Illuminate\Http\Request;
+use App\Traits\JWTAuthTrait;
 
 class VoucherController extends Controller
 {
-    public function __construct()
-    {
-        $this->middleware('auth:admin', [
-            'except' => ['index', 'indexActive', 'create', 'update', 'delete'],
-        ]);
-        if (! auth('admin')->check()) { //
-            return response()->json([
-                'message' => 'Unauthorized',
-            ], 401);
-        }
-    }
-
+    use JWTAuthTrait;
     //lay danh sach voucher
     public function index()
     {
@@ -31,17 +21,46 @@ class VoucherController extends Controller
             $voucher->min_order_amount    = (float) $voucher->min_order_amount;
         }
         return $voucherList->isNotEmpty()
-        ? response()->json(['message' => 'Lấy danh sách voucher thành công', 'vouchers' => $voucherList], 200)
-        : response()->json(['message' => 'Không có voucher'], 404);
+        ? response()->json([
+            'status' => true,
+            'message' => 'Lấy danh sách voucher thành công',
+            'data' => [
+                'vouchers' => $voucherList
+            ]
+        ], 200)
+        : response()->json([
+            'status' => false, 
+            'message' => 'Không có voucher'
+        ], 404);
+    }
+
+    //lay voucher đang hoạt động
+    public function indexActive()
+    {
+        $voucherList = Voucher::where('active', true)->get();
+        return $voucherList->isNotEmpty()
+        ? response()->json([
+            'status' => true,
+            'message' => 'Lấy danh sách voucher thành công',
+            'data' => [
+                'vouchers' => $voucherList
+            ]
+        ], 200)
+        : response()->json([
+            'status' => false, 
+            'message' => 'Không có voucher'
+        ], 404);
     }
 
     //lay voucher đang hoạt động và sử dụng được cho khách hàng
-    public function indexActive(Request $request)
+    public function indexActiveForUser()
     {
-        $userId = $request->user_id;
-        if (! $userId) {
-            return response()->json(['message' => 'Thông tin người dùng không hợp lệ'], 400);
+        $authCheck = $this->checkUserAuth();
+        if ($authCheck !== true) {
+            return $authCheck;
         }
+
+        $user   = $this->getJWTAuthInfo()['user'];
 
         $currentDate = now();
 
@@ -52,10 +71,10 @@ class VoucherController extends Controller
             ->get();
 
         // Lọc thêm các voucher mà user có thể sử dụng
-        $voucherList = $voucherList->filter(function ($voucher) use ($userId) {
+        $voucherList = $voucherList->filter(function ($voucher) use ($user) {
             // Kiểm tra số lần user đã sử dụng voucher này
             $usageCount = VoucherUsage::where('voucher_id', $voucher->id)
-                ->where('user_id', $userId)
+                ->where('user_id', $user->id)
                 ->count();
 
             // Chỉ lấy voucher mà user chưa sử dụng hết số lần cho phép
@@ -72,7 +91,7 @@ class VoucherController extends Controller
 
             // Lấy số lần người dùng đã sử dụng voucher này
             $usageCount = VoucherUsage::where('voucher_id', $voucher->id)
-                ->where('user_id', $userId)
+                ->where('user_id', $user->id)
                 ->count();
             //số lần sử dụng voucher còn lại
             $voucher->remaining_usage = $voucher->limit_per_user - $usageCount;
@@ -80,10 +99,16 @@ class VoucherController extends Controller
 
         return $voucherList->isNotEmpty()
         ? response()->json([
-            'message'  => 'Lấy danh sách voucher thành công',
-            'vouchers' => $voucherList,
+            'status' => true,
+            'message' => 'Lấy danh sách voucher thành công',
+            'data' => [
+                'vouchers' => $voucherList
+            ]
         ], 200)
-        : response()->json(['message' => 'Không có voucher khả dụng'], 404);
+        : response()->json([
+            'status' => false, 
+            'message' => 'Không có voucher khả dụng'
+        ], 404);
     }
 
     //them voucher
@@ -91,7 +116,10 @@ class VoucherController extends Controller
     {
         $existingVoucher = Voucher::where('code', $request->code)->first();
         if ($existingVoucher) {
-            return response()->json(['message' => 'Đã có voucher này'], 409);
+            return response()->json([
+                'status' => false, 
+                'message' => 'Đã có voucher này'
+            ], 409);
         }
 
         try {
@@ -109,23 +137,38 @@ class VoucherController extends Controller
                 'limit_per_user'      => (int) $request->limit_per_user,
                 'active'              => (bool) true,
             ]);
-            return response()->json(['message' => 'Thêm voucher thành công', 'voucher' => $voucher], 201);
+            return response()->json([
+                'status' => true,
+                'message' => 'Thêm voucher thành công',
+                'data' => [
+                    'voucher' => $voucher
+                ]
+            ], 201);
         } catch (\Exception $e) {
-            return response()->json(['message' => 'Thêm voucher thất bại', 'error' => $e->getMessage()], 400);
+            return response()->json([
+                'status' => false, 
+                'message' => 'Thêm voucher thất bại', 
+            ], 400);
         }
     }
     //sua voucher
-    public function update(Request $request)
+    public function update($id, Request $request)
     {
-        $voucher = Voucher::where('id', $request->id)->first();
+        $voucher = Voucher::where('id', $id)->first();
         if (! $voucher) {
-            return response()->json(['message' => 'Không tìm thấy voucher'], 404);
+            return response()->json([
+                'status' => false, 
+                'message' => 'Không tìm thấy voucher'
+            ], 404);
         }
 
         //trừ code của voucher cần sửa với code của voucher đã tồn tại
         $existingVoucher = Voucher::where('code', $request->code)->where('id', '!=', $request->id)->first();
         if ($existingVoucher) {
-            return response()->json(['message' => 'Đã có voucher này'], 409);
+            return response()->json([
+                'status' => false, 
+                'message' => 'Đã có voucher này'
+            ], 409);
         }
 
         try {
@@ -143,25 +186,43 @@ class VoucherController extends Controller
                 'limit_per_user'      => (int) $request->limit_per_user,
                 'active'              => (bool) $request->active,
             ]);
-            return response()->json(['message' => 'Sửa voucher thành công', 'voucher' => $voucher], 200);
+            return response()->json([
+                'status' => true,
+                'message' => 'Sửa voucher thành công',
+                'data' => [
+                    'voucher' => $voucher
+                ]
+            ], 200);
         } catch (\Exception $e) {
-            return response()->json(['message' => 'Sửa voucher thất bại', 'error' => $e->getMessage()], 400);
+            return response()->json([
+                'status' => false, 
+                'message' => 'Sửa voucher thất bại', 
+            ], 400);
         }
     }
 
     //xoa voucher
-    public function delete(Request $request)
+    public function delete($id)
     {
-        $voucher = Voucher::where('id', $request->id)->first();
+        $voucher = Voucher::where('id', $id)->first();
         if (! $voucher) {
-            return response()->json(['message' => 'Không tìm thấy voucher'], 404);
+            return response()->json([
+                'status' => false, 
+                'message' => 'Không tìm thấy voucher'
+            ], 404);
         }
 
         try {
             $voucher->update(['active' => 0]);
-            return response()->json(['message' => 'Xóa voucher thành công'], 200);
+            return response()->json([
+                'status' => true,
+                'message' => 'Xóa voucher thành công',
+            ], 200);
         } catch (\Exception $e) {
-            return response()->json(['message' => 'Xóa voucher thất bại', 'error' => $e->getMessage()], 400);
+            return response()->json([
+                'status' => false, 
+                'message' => 'Xóa voucher thất bại', 
+            ], 400);
         }
     }
 }

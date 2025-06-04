@@ -12,7 +12,6 @@ class Admin extends Authenticatable implements JWTSubject
     use HasFactory, Notifiable, HasApiTokens;
 
     protected $table = 'admins';
-    protected $guard = 'admin';
 
     protected $fillable = [
         'username',
@@ -28,7 +27,6 @@ class Admin extends Authenticatable implements JWTSubject
         'refresh_token',
     ];
 
-
     // JWT required methods
     public function getJWTIdentifier()
     {
@@ -39,7 +37,7 @@ class Admin extends Authenticatable implements JWTSubject
     {
         return [
             'username' => $this->username,
-            'guard'    => 'admin',
+            'type'     => 'admin',
         ];
     }
 

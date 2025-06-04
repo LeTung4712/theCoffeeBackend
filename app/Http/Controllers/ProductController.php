@@ -29,8 +29,36 @@ class ProductController extends Controller
         $productList = Product::orderby('id')->get();
 
         return $productList->isNotEmpty()
-        ? response(['products' => $productList], 200)
-        : response(['message' => 'Không có sản phẩm nào'], 404);
+        ? response()->json([
+            'status' => true,
+            'message' => 'Lấy danh sách sản phẩm thành công',
+            'data' => [
+                'products' => $productList
+            ]
+        ], 200)
+        : response()->json([
+            'status' => false,
+            'message' => 'Không có sản phẩm nào'
+        ], 404);
+    }
+
+    // Get all active products
+    public function indexActive()
+    {
+        $productList = Product::where('active', true)->orderby('id')->get();
+
+        return $productList->isNotEmpty()
+        ? response()->json([
+            'status' => true,
+            'message' => 'Lấy danh sách sản phẩm thành công',
+            'data' => [
+                'products' => $productList
+            ]
+        ], 200)
+        : response()->json([
+            'status' => false,
+            'message' => 'Không có sản phẩm nào'
+        ], 404);
     }
 
     //thêm sản phẩm
@@ -38,7 +66,10 @@ class ProductController extends Controller
     {
         $existingProduct = Product::where('name', $request->name)->first();
         if ($existingProduct) {
-            return response()->json(['message' => 'Đã có sản phẩm này'], 409);
+            return response()->json([
+                'status' => false,
+                'message' => 'Đã có sản phẩm này'
+            ], 409);
         }
 
         $productData = $request->only(['name', 'category_id', 'description', 'price', 'price_sale', 'image_url']);
@@ -55,9 +86,19 @@ class ProductController extends Controller
                 ]);
             }
 
-            return response()->json(['message' => 'Thêm sản phẩm thành công'], 201);
+            return response()->json([
+                'status' => true,
+                'message' => 'Thêm sản phẩm thành công',
+                'data' => [
+                    'product' => $product
+                ]
+            ], 201);
         } catch (\Exception $e) {
-            return response()->json(['message' => 'Thêm sản phẩm thất bại', 'error' => $e->getMessage()], 400);
+            return response()->json([
+                'status' => false,
+                'message' => 'Thêm sản phẩm thất bại',
+                'error' => $e->getMessage()
+            ], 400);
         }
     }
 
@@ -70,9 +111,9 @@ class ProductController extends Controller
     //lấy danh sách sản phẩm theo category_id
     //ý tưởng: lấy danh sách category theo category_id,
     //sau đó lấy tất cả category con của category đó, sau đó lấy tất cả product theo category_id
-    public function indexByCategoryId(Request $request)
+    public function indexByCategoryId($categoryId)
     {
-        $categoryList = Category::where('id', $request->category_id)->get();
+        $categoryList = Category::where('id', $categoryId)->get();
         $allCategories = $categoryList->merge($categoryList->map(function ($category) {
             return $this->getChild($category);
         })->flatten());
@@ -89,20 +130,32 @@ class ProductController extends Controller
         }
 
         return $productList->isNotEmpty()
-        ? response(['message' => 'Lấy danh sách sản phẩm thành công', 'products' => $productList], 200)
-        : response(['message' => 'Không có sản phẩm nào'], 404);
+        ? response()->json([
+            'status' => true,
+            'message' => 'Lấy danh sách sản phẩm thành công',
+            'data' => [
+                'products' => $productList
+            ]
+        ], 200)
+        : response()->json([
+            'status' => false,
+            'message' => 'Không có sản phẩm nào'
+        ], 404);
     }
 
     //lấy thông tin sản phẩm
-    public function getProductInfo(Request $request)
+    public function getProductInfo($id)
     {
-        $productInfo = Product::where('id', $request->product_id)
+        $productInfo = Product::where('id', $id)
             ->where('active', true)
             ->first();
 
         // Kiểm tra xem sản phẩm có tồn tại không
         if (!$productInfo) {
-            return response(['message' => 'Không có sản phẩm này trong dữ liệu'], 404);
+            return response()->json([
+                'status' => false,
+                'message' => 'Không có sản phẩm này trong dữ liệu'
+            ], 404);
         }
 
         // Chuyển đổi các giá trị số sang dạng số
@@ -123,30 +176,49 @@ class ProductController extends Controller
             $product->price_sale = (float) $product->price_sale;
         }
 
-        return response([
+        return response()->json([
+            'status' => true,
             'message' => 'Lấy thông tin sản phẩm thành công',
-            'product' => $productInfo,
-            'same_products' => $sameProductList,
+            'data' => [
+                'product' => $productInfo,
+                'same_products' => $sameProductList,
+            ]
         ], 200);
     }
 
     //cập nhật sản phẩm
-    public function update(Request $request)
+    public function update($id, Request $request)
     {
-        $product = Product::find($request->input('id'));
+        $product = Product::find($id);
         if (!$product) {
-            return response()->json(['message' => 'Không có sản phẩm này trong dữ liệu'], 404);
+            return response()->json([
+                'status' => false,
+                'message' => 'Không có sản phẩm này trong dữ liệu'
+            ], 404);
         }
 
         if (!$this->isValidPrice($request)) {
-            return response()->json(['message' => 'Giá giảm phải nhỏ hơn giá gốc hoặc vui lòng nhập giá gốc'], 400);
+            return response()->json([
+                'status' => false,
+                'message' => 'Giá giảm phải nhỏ hơn giá gốc hoặc vui lòng nhập giá gốc'
+            ], 400);
         }
 
         try {
             $product->update($request->all());
-            return response()->json(['message' => 'Cập nhật thành công', 'product' => $product], 200);
+            return response()->json([
+                'status' => true,
+                'message' => 'Cập nhật thành công',
+                'data' => [
+                    'product' => $product
+                ]
+            ], 200);
         } catch (\Exception $err) {
-            return response()->json(['message' => 'Cập nhật thất bại', 'error' => $err->getMessage()], 400);
+            return response()->json([
+                'status' => false,
+                'message' => 'Cập nhật thất bại',
+                'error' => $err->getMessage()
+            ], 400);
         }
     }
 
@@ -166,18 +238,28 @@ class ProductController extends Controller
     }
 
     //xóa sản phẩm
-    public function delete(Request $request)
+    public function delete($id)
     {
-        $product = Product::find($request->input('id'));
+        $product = Product::find($id);
         if (!$product) {
-            return response()->json(['message' => 'Không có sản phẩm này trong dữ liệu'], 404);
+            return response()->json([
+                'status' => false,
+                'message' => 'Không có sản phẩm này trong dữ liệu'
+            ], 404);
         }
 
         try {
             $product->delete();
-            return response()->json(['message' => 'Xóa sản phẩm thành công'], 200);
+            return response()->json([
+                'status' => true,
+                'message' => 'Xóa sản phẩm thành công'
+            ], 200);
         } catch (\Exception $e) {
-            return response()->json(['message' => 'Xóa sản phẩm thất bại', 'error' => $e->getMessage()], 400);
+            return response()->json([
+                'status' => false,
+                'message' => 'Xóa sản phẩm thất bại',
+                'error' => $e->getMessage()
+            ], 400);
         }
     }
 }

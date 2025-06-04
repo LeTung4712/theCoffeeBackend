@@ -1,5 +1,5 @@
 <?php
-namespace App\Http\Controllers\RecommenderSystem;
+namespace App\Http\Controllers;
 
 use App\Data\TransactionData;
 use App\Http\Controllers\Controller;
@@ -41,6 +41,7 @@ class RecommendationController extends Controller
             $associationRules = $fpGrowthService->generateAssociationRules($frequentItemsets);
         } else {
             return response()->json([
+                'status'  => false,
                 'message' => 'Thuật toán không hợp lệ',
             ], 400);
         }
@@ -106,16 +107,20 @@ class RecommendationController extends Controller
 
         if (count($associationRules) == 0) {
             return response()->json([
+                'status'  => false,
                 'message' => 'Không có luật kết hợp nào',
             ], 404);
         } else {
             return response()->json([
+                'status'            => true,
                 'message'           => 'Phân tích luật kết hợp thành công',
-                'totalTransactions' => count($transactions),
-                'totalRules'        => count($associationRules),
-                'executionTime'     => $executionTime, // Thời gian thực thi (milliseconds)
-                //'frequentItemsets'  => $frequentItemsets,
-                'associationRules'  => $rulesWithProducts,
+                'data'              => [
+                    'totalTransactions' => count($transactions),
+                    'totalRules'        => count($associationRules),
+                    'executionTime'     => $executionTime, // Thời gian thực thi (milliseconds)
+                    //'frequentItemsets'  => $frequentItemsets,
+                    'associationRules'  => $rulesWithProducts,
+                ],
             ], 200);
         }
     }
@@ -205,9 +210,12 @@ class RecommendationController extends Controller
         }
 
         return response()->json([
+            'status'             => true,
             'message'            => 'Lấy danh sách sản phẩm đề xuất thành công',
-            'recommend_id'       => $recommendedIds,
-            'recommend_products' => $recommended_products,
+            'data'               => [
+                'recommend_id'       => $recommendedIds,
+                'recommend_products' => $recommended_products,
+            ],
         ], 200);
     }
 
@@ -227,8 +235,11 @@ class RecommendationController extends Controller
             ->get();
 
         return response()->json([
+            'status'             => true,
             'message'            => 'Đề xuất dựa trên sản phẩm phổ biến',
-            'recommend_products' => $popularProducts,
+            'data'               => [
+                'recommend_products' => $popularProducts,
+            ],
         ], 200);
     }
 
@@ -239,6 +250,7 @@ class RecommendationController extends Controller
 
         if (count($associationRules) == 0) {
             return response()->json([
+                'status'  => false,
                 'message' => 'Không có luật kết hợp nào',
             ], 404);
         }
@@ -270,8 +282,11 @@ class RecommendationController extends Controller
         }
 
         return response()->json([
-            'message'          => 'Lấy danh sách luật kết hợp thành công',
-            'associationRules' => $associationRules,
+            'status'             => true,
+            'message'            => 'Lấy danh sách luật kết hợp thành công',
+            'data'               => [
+                'associationRules' => $associationRules,
+            ],
         ], 200);
 
     }

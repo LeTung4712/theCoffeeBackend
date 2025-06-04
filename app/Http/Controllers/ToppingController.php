@@ -12,16 +12,6 @@ use App\Models\Topping;
 
 class ToppingController extends Controller
 {
-    public function __construct()
-    {
-        $this->middleware('auth:admin', ['except' => ['index', 'getActiveToppings', 'create', 'update', 'delete']]);
-        if (!auth('admin')->check()) { //
-            return response()->json([
-                'message' => 'Unauthorized'
-            ], 401);
-        }
-    }
-
     //lay danh sach topping
     public static function index(){
         $toppings = Topping::orderby('id')->get();
@@ -30,23 +20,44 @@ class ToppingController extends Controller
             $topping->price = (float) $topping->price;
         }
         return $toppings->isNotEmpty()
-            ? response()->json(['message' => 'Lấy danh sách topping thành công', 'toppings' => $toppings], 200)
-            : response()->json(['message' => 'Không có topping'], 404);
+            ? response()->json([
+                'status' => true,
+                'message' => 'Lấy danh sách topping thành công',
+                'data' => [
+                    'toppings' => $toppings
+                ]
+            ], 200)
+            : response()->json([
+                'status' => false, 
+                'message' => 'Không có topping'
+            ], 404);
     }
 
     //lay danh sach topping active
-    public static function getActiveToppings(){
+    public static function indexActive(){
         $toppings = Topping::where('active', true)->get();
         return $toppings->isNotEmpty()
-            ? response()->json(['message' => 'Lấy danh sách topping thành công', 'toppings' => $toppings], 200)
-            : response()->json(['message' => 'Không có topping'], 404);
+            ? response()->json([
+                'status' => true,
+                'message' => 'Lấy danh sách topping thành công',
+                'data' => [
+                    'toppings' => $toppings
+                ]
+            ], 200)
+            : response()->json([
+                'status' => false, 
+                'message' => 'Không có topping'
+            ], 404);
     }
 
     //them topping
     public function create(Request $request){
         $existingTopping = Topping::where('name', $request->name)->first();
         if ($existingTopping) {
-            return response()->json(['message' => 'Đã có topping này'], 409);
+            return response()->json([
+                'status' => false, 
+                'message' => 'Đã có topping này'
+            ], 409);
         }
 
         try {
@@ -55,9 +66,18 @@ class ToppingController extends Controller
                 'price' => (float) $request->price ?? 0,
                 'active' => (bool) true
             ]);
-            return response()->json(['message' => 'Thêm topping thành công', 'topping' => $topping], 200);
+            return response()->json([
+                'status' => true,
+                'message' => 'Thêm topping thành công',
+                'data' => [
+                    'topping' => $topping
+                ]
+            ], 200);
         } catch (\Exception $e) {
-            return response()->json(['message' => 'Thêm topping thất bại', 'error' => $e->getMessage()], 400);
+            return response()->json([
+                'status' => false, 
+                'message' => 'Thêm topping thất bại', 
+            ], 400);
         }
     }
 
@@ -65,7 +85,10 @@ class ToppingController extends Controller
     public function update(Request $request){
         $topping = Topping::find($request->id);
         if (!$topping) {
-            return response()->json(['message' => 'Không có topping này trong dữ liệu'], 404);
+            return response()->json([
+                'status' => false, 
+                'message' => 'Không có topping này trong dữ liệu'
+            ], 404);
         }
 
         try {
@@ -73,9 +96,18 @@ class ToppingController extends Controller
             $topping->price = (float) $request->price ?? 0;
             $topping->active = (bool) $request->active;
             $topping->save();
-            return response()->json(['message' => 'Cập nhật topping thành công', 'topping' => $topping], 200);
+            return response()->json([
+                'status' => true,
+                'message' => 'Cập nhật topping thành công',
+                'data' => [
+                    'topping' => $topping
+                ]
+            ], 200);
         } catch (\Exception $e) {
-            return response()->json(['message' => 'Cập nhật topping thất bại', 'error' => $e->getMessage()], 400);
+            return response()->json([
+                'status' => false, 
+                'message' => 'Cập nhật topping thất bại', 
+            ], 400);
         }
     }
     
@@ -83,14 +115,23 @@ class ToppingController extends Controller
     public function delete(Request $request){
         $topping = Topping::find($request->id);
         if (!$topping) {
-            return response()->json(['message' => 'Không có topping này trong dữ liệu'], 404);
+            return response()->json([
+                'status' => false, 
+                'message' => 'Không có topping này trong dữ liệu'
+            ], 404);
         }
 
         try {
             $topping->delete();
-            return response()->json(['message' => 'Xóa thành công'], 200);
+            return response()->json([
+                'status' => true,
+                'message' => 'Xóa thành công',
+            ], 200);
         } catch (\Exception $e) {
-            return response()->json(['message' => 'Xóa topping thất bại', 'error' => $e->getMessage()], 400);
+            return response()->json([
+                'status' => false, 
+                'message' => 'Xóa topping thất bại', 
+            ], 400);
         }
     }
 }

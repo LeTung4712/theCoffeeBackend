@@ -7,7 +7,7 @@ use App\Http\Controllers\GoongMapController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProductController;
-use App\Http\Controllers\RecommenderSystem\RecommendationController;
+use App\Http\Controllers\RecommendationController;
 use App\Http\Controllers\ToppingController;
 use App\Http\Controllers\User\AddressNoteController;
 use App\Http\Controllers\User\AuthUserController;
@@ -32,110 +32,119 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
  */
 Route::group(['prefix' => 'v1'], function () {
+    // Admin routes
+    Route::group(['prefix' => 'admin'], function () {
+        // Auth routes
+        Route::post('auth/login', [AuthAdminController::class, 'login']);
+        Route::post('auth/refresh-token', [AuthAdminController::class, 'refreshToken']);
+        Route::post('auth/logout', [AuthAdminController::class, 'logout']);
 
-    Route::group(['middleware' => 'admin'], function () {
-        Route::group(['prefix' => 'admin'], function () {
-            //admin auth api
-            Route::post('auth/login', [AuthAdminController::class, 'login']);
-        });
-        //category api
-        Route::group(['prefix' => 'category'], function () {
-            Route::get('index', [CategoryController::class, 'index']);                     // http://localhost:8000/api/v1/admin/category/index
-            Route::post('create', [CategoryController::class, 'create']);                  // vd http://localhost:8000/api/v1/admin/category/create?name=abc&parent_id=2&image_url=abc
-            Route::delete('delete', [CategoryController::class, 'delete']);                // http://localhost:8000/api/v1/admin/category/delete?id=1
-            Route::put('update', [CategoryController::class, 'update']);                   //http://localhost:8000/api/v1/admin/category/update?id=1&name=abc&parent_id=2
-            Route::get('indexByParentId', [CategoryController::class, 'indexByParentId']); // http://localhost:8000/api/v1/admin/category/indexByParentId?parent_id=1
-        });
-        //product api
-        Route::group(['prefix' => 'product'], function () {
-            Route::get('index', [ProductController::class, 'index']);                         // http://localhost:8000/api/v1/admin/product/index
-            Route::get('getProductInfo', [ProductController::class, 'getProductInfo']);       // http://localhost:8000/api/v1/admin/product/getProductInfo?id=1
-            Route::post('create', [ProductController::class, 'create']);                      // http://localhost:8000/api/v1/admin/product/create?name=abc&category_id=1&price=10000&description=abc&image_url=abc&active=1&price_sale=10000
-            Route::put('update', [ProductController::class, 'update']);                       // http://localhost:8000/api/v1/admin/product/update?id=1&name=abc&category_id=1&price=10000&description=abc&image_url=abc&active=1&price_sale=10000
-            Route::delete('delete', [ProductController::class, 'delete']);                    // http://localhost:8000/api/v1/admin/product/delete?id=1
-            Route::get('indexByCategoryId', [ProductController::class, 'indexByCategoryId']); // http://localhost:8000/api/v1/admin/product/indexByCategoryId?category_id=1
-        });
-        //topping api
-        Route::group(['prefix' => 'topping'], function () {
-            Route::get('index', [ToppingController::class, 'index']);                   // http://localhost:8000/api/v1/admin/topping/index
-            Route::get('indexActive', [ToppingController::class, 'getActiveToppings']); // http://localhost:8000/api/v1/admin/topping/indexActive
-            Route::post('create', [ToppingController::class, 'create']);                // http://localhost:8000/api/v1/admin/topping/create?name=abc&price=10000&description=abc&image_url=abc&active=1
-            Route::put('update', [ToppingController::class, 'update']);                 // http://localhost:8000/api/v1/admin/topping/update?id=1&name=abc&price=10000&description=abc&image_url=abc&active=1
-            Route::delete('delete', [ToppingController::class, 'delete']);              // http://localhost:8000/api/v1/admin/topping/delete?id=1
-        });
-        //voucher api
-        Route::group(['prefix' => 'voucher'], function () {
-            Route::get('index', [VoucherController::class, 'index']);             // http://localhost:8000/api/v1/admin/voucher/index
-            Route::get('indexActive', [VoucherController::class, 'indexActive']); // http://localhost:8000/api/v1/admin/voucher/indexActive
-            Route::post('create', [VoucherController::class, 'create']);          // http://localhost:8000/api/v1/admin/voucher/create?name=abc&description=abc&image_url=abc&active=1&discount=10000&start_date=2021-01-01&end_date=2021-01-01
-            Route::put('update', [VoucherController::class, 'update']);           // http://localhost:8000/api/v1/admin/voucher/update?id=1&name=abc&description=abc&image_url=abc&active=1&discount=10000&start_date=2021-01-01&end_date=2021-01-01
-            Route::delete('delete', [VoucherController::class, 'delete']);        // http://localhost:8000/api/v1/admin/voucher/delete?id=1
-        });
-        //order api
-        Route::group(['prefix' => 'order'], function () {
-            Route::post('addOrder', [OrderController::class, 'addOrder']);                                // http://localhost:8000/api/v1/admin/order/addOrder?user_id=1&user_name=abc&mobile_no=0828035636&address=abc&note=abc&total_price=10000&payment_method=1&products=[{"product_id":1,"product_count":1,"topping_id":1,"topping_count":1,"size":"M","price":10000}]
-            Route::put('startDelivery', [OrderController::class, 'startDelivery']);                       // http://localhost:8000/api/v1/admin/order/startDelivery?order_id=TCH16903883611
-            Route::put('paidOrder', [OrderController::class, 'paidOrder']);                               // http://localhost:8000/api/v1/admin/order/paidOrder?order_id=TCH16903883611
-            Route::put('successOrder', [OrderController::class, 'successOrder']);                         // http://localhost:8000/api/v1/admin/order/successOrder?order_id=TCH16903883611
-            Route::put('cancelOrder', [OrderController::class, 'cancelOrder']);                           // http://localhost:8000/api/v1/admin/order/cancelOrder?order_id=TCH16903883611
-            Route::get('getOrderInfo', [OrderController::class, 'getOrderInfo']);                         // http://
-            Route::get('getSuccessOrders', [OrderController::class, 'getSuccessOrders']);                 // http://localhost:8000/api/v1/admin/order/getSuccessOrder
-            Route::get('getPendingPaymentOrders', [OrderController::class, 'getPendingPaymentOrders']);   // http://localhost:8000/api/v1/admin/order/getPendingPaymentOrders
-            Route::get('getPendingDeliveryOrders', [OrderController::class, 'getPendingDeliveryOrders']); // http://localhost:8000/api/v1/admin/order/getPendingDeliveryOrders
-            Route::get('getDeliveringOrders', [OrderController::class, 'getDeliveringOrders']);           // http://localhost:8000/api/v1/admin/order/getDeliveringOrders
-            Route::get('analytics', [AnalyzeController::class, 'getAnalyzeOrders']);                      // http://localhost:8000/api/v1/admin/order/getAnalyzeOrders?timeRange=week
-        });
+        // Protected routes
+        Route::middleware('auth.admin')->group(function () {
+            // Categories
+            Route::get('categories', [CategoryController::class, 'index']);
+            Route::post('categories', [CategoryController::class, 'create']);
+            Route::put('categories/{id}', [CategoryController::class, 'update']);
+            Route::delete('categories/{id}', [CategoryController::class, 'delete']);
+            Route::get('categories/{id}/children', [CategoryController::class, 'indexByParentId']); //http://localhost:8000/api/v1/admin/categories/1/products
 
-        //api cho recommender system
-        Route::group(['prefix' => 'recommenderSystem'], function () {
-                                                                                                                     //api analyze shopping behavior
-            Route::post('analyzeShoppingBehavior', [RecommendationController::class, 'getAnalyzeShoppingBehavior']); // http://localhost:8000/api/v1/recommenderSystem/analyzeShoppingBehavior
-                                                                                                                     //api recommendation
-            Route::get('associationRules', [RecommendationController::class, 'getAssociationRules']);                // http://localhost:8000/api/v1/recommenderSystem/associationRules
-            Route::get('recommendation', [RecommendationController::class, 'getRecommendations']);                   // http://localhost:8000/api/v1/recommenderSystem/recommendation?cartItems=[1,2,3]
+            // Products
+            Route::get('products', [ProductController::class, 'index']);
+            Route::get('products/{id}', [ProductController::class, 'getProductInfo']);
+            Route::post('products', [ProductController::class, 'create']);
+            Route::put('products/{id}', [ProductController::class, 'update']);
+            Route::delete('products/{id}', [ProductController::class, 'delete']);
+            Route::get('categories/{categoryId}/products', [ProductController::class, 'indexByCategoryId']);
+
+            // Toppings
+            Route::get('toppings', [ToppingController::class, 'index']);
+            Route::post('toppings', [ToppingController::class, 'create']);
+            Route::put('toppings/{id}', [ToppingController::class, 'update']);
+            Route::delete('toppings/{id}', [ToppingController::class, 'delete']);
+
+            // Vouchers
+            Route::get('vouchers', [VoucherController::class, 'index']);
+            Route::post('vouchers', [VoucherController::class, 'create']);
+            Route::put('vouchers/{id}', [VoucherController::class, 'update']);
+            Route::delete('vouchers/{id}', [VoucherController::class, 'delete']);
+
+            // Orders
+            Route::get('orders', [OrderController::class, 'index']);
+            Route::get('orders/{id}', [OrderController::class, 'getOrderInfo']);
+            Route::patch('orders/{id}/start-delivery', [OrderController::class, 'startDelivery']);
+            //Route::patch('orders/{id}/mark-as-paid', [OrderController::class, 'paidOrder']);
+            Route::patch('orders/{id}/complete', [OrderController::class, 'successOrder']);
+            Route::patch('orders/{id}/cancel', [OrderController::class, 'cancelOrder']);
+            Route::get('orders/status/completed', [OrderController::class, 'getSuccessOrders']);
+            Route::get('orders/status/pending-payment', [OrderController::class, 'getPendingPaymentOrders']);
+            Route::get('orders/status/pending-delivery', [OrderController::class, 'getPendingDeliveryOrders']);
+            Route::get('orders/status/delivering', [OrderController::class, 'getDeliveringOrders']);
+            Route::get('orders/analytics', [AnalyzeController::class, 'getAnalyzeOrders']);
+
+            // Recommender 
+            Route::post('recommender/analyze-shopping', [RecommendationController::class, 'getAnalyzeShoppingBehavior']);
+            Route::get('recommender/association-rules', [RecommendationController::class, 'getAssociationRules']);
+            
         });
     });
 
-    //api cho userv1/
-    Route::group(['prefix' => 'user'], function () {
-        // Auth routes - không cần JWT middleware
-        Route::group(['prefix' => 'auth'], function () {
-            Route::post('login', [AuthUserController::class, 'login']);          // http://localhost:8000/api/v1/user/auth/login
-            Route::post('checkOtp', [AuthUserController::class, 'checkOtp']);    // http://localhost:8000/api/v1/user/auth/checkOtp
-            Route::post('logout', [AuthUserController::class, 'logout']);        // http://localhost:8000/api/v1/user/auth/logout
-            Route::post('refresh', [AuthUserController::class, 'refreshToken']); // http://localhost:8000/api/v1/user/auth/refresh
-        });
+    // User routes
+    Route::group(['prefix' => 'users'], function () {
+        // Auth routes
+        Route::post('auth/login', [AuthUserController::class, 'login']);
+        Route::post('auth/verify-otp', [AuthUserController::class, 'checkOtp']);
+        Route::post('auth/refresh-token', [AuthUserController::class, 'refreshToken']);
 
-        // Protected routes - yêu cầu JWT authentication
-        Route::group(['middleware' => 'auth.api'], function () {
-            // User info routes
-            Route::group(['prefix' => 'info'], function () {
-                Route::put('updateInfo', [UserController::class, 'updateInfo']); // http://localhost:8000/api/v1/user/info/updateInfo
-                Route::get('getAddressNote', [AddressNoteController::class, 'getAddressNote']);
-                Route::post('createAddressNote', [AddressNoteController::class, 'createAddressNote']);
-                Route::put('updateAddressNote', [AddressNoteController::class, 'updateAddressNote']);
-                Route::delete('deleteAddressNote', [AddressNoteController::class, 'deleteAddressNote']);
-                Route::get('getOrderHistory', [OrderController::class, 'getOrderHistory']);
+        // Protected routes
+        Route::middleware('auth.user')->group(function () {
+            Route::post('auth/logout', [AuthUserController::class, 'logout']);
+
+            // User profile
+            Route::get('me', [UserController::class, 'me']);
+            Route::put('me', [UserController::class, 'updateInfo']);
+
+            // Addresses
+            Route::get('addresses', [AddressNoteController::class, 'getAddressNote']);
+            Route::post('addresses', [AddressNoteController::class, 'createAddressNote']);
+            Route::put('addresses/{id}', [AddressNoteController::class, 'updateAddressNote']);
+            Route::delete('addresses/{id}', [AddressNoteController::class, 'deleteAddressNote']);
+
+            // Vouchers
+            Route::get('vouchers', [VoucherController::class, 'indexActiveForUser']);
+
+            // Orders
+            Route::post('orders', [OrderController::class, 'addOrder']);
+            Route::get('orders', [OrderController::class, 'getOrderHistory']);
+            Route::middleware(['check.order.owner'])->group(function () {
+                Route::patch('orders/{id}/complete', [OrderController::class, 'successOrder']);
+                Route::patch('orders/{id}/cancel', [OrderController::class, 'cancelOrder']);
             });
         });
     });
 
-    //api thanh toán
-    Route::group(['prefix' => 'payment'], function () {
-                                                                                         //=============================================== MOMO ================================================
-        Route::post('momo', [PaymentController::class, 'momo_payment']);                 // http://localhost:8000/api/v1/payment/momo
-        Route::post('momo/callback', [PaymentController::class, 'momo_callback']);       // Callback từ MOMO
-                                                                                         //=============================================== COD ================================================
-        Route::post('cod', [PaymentController::class, 'cod_payment']);                   // Đánh dấu thanh toán COD
-        Route::post('cod/complete', [PaymentController::class, 'complete_cod_payment']); // Xác nhận đã thanh toán COD
-                                                                                         //=============================================== VNPAY ================================================
-        Route::post('vnpay', [PaymentController::class, 'vnpay_payment']);               // http://localhost:8000/api/v1/payment/vnpay
-        Route::post('vnpay/callback', [PaymentController::class, 'vnpay_callback']);     // Callback từ VNPAY
-                                                                                         //=============================================== ZALOPAY ================================================
-        Route::post('zalopay', [PaymentController::class, 'zalopay_payment']);           // http://localhost:8000/api/v1/payment/zalopay
-        Route::post('zalopay/callback', [PaymentController::class, 'zalopay_callback']); // Callback từ ZALOPAY
+    // Payment routes
+    Route::prefix('payments')->group(function () {
+        // Protected routes
+        Route::middleware('auth.user')->group(function () {
+            // Momo
+            Route::post('momo', [PaymentController::class, 'momo_payment']);
+            // VNPay
+            Route::post('vnpay', [PaymentController::class, 'vnpay_payment']);
+            // ZaloPay
+            Route::post('zalopay', [PaymentController::class, 'zalopay_payment']);
+        });
+        Route::post('momo/callback', [PaymentController::class, 'momo_callback']);
+        Route::post('vnpay/callback', [PaymentController::class, 'vnpay_callback']);
+        Route::post('zalopay/callback', [PaymentController::class, 'zalopay_callback']);
     });
 
-    Route::get('/map/autocomplete', [GoongMapController::class, 'searchAddress']); // http://localhost:8000/api/v1/map/autocomplete?query=abc
-
+    //Public routes
+    Route::get('products', [ProductController::class, 'indexActive']);
+    Route::get('products/{id}', [ProductController::class, 'getProductInfo']);
+    Route::get('categories', [CategoryController::class, 'indexActive']);
+    Route::get('toppings', [ToppingController::class, 'indexActive']);
+    Route::get('vouchers', [VoucherController::class, 'indexActive']);
+    Route::get('recommendations', [RecommendationController::class, 'getRecommendations']);
+    // Map services
+    Route::get('map/addresses', [GoongMapController::class, 'searchAddress']);
 });
