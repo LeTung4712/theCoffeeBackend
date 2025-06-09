@@ -112,13 +112,13 @@ class RecommendationController extends Controller
             ], 404);
         } else {
             return response()->json([
-                'status'            => true,
-                'message'           => 'Phân tích luật kết hợp thành công',
-                'data'              => [
+                'status'  => true,
+                'message' => 'Phân tích luật kết hợp thành công',
+                'data'    => [
                     'totalTransactions' => count($transactions),
                     'totalRules'        => count($associationRules),
                     'executionTime'     => $executionTime, // Thời gian thực thi (milliseconds)
-                    //'frequentItemsets'  => $frequentItemsets,
+                                                           //'frequentItemsets'  => $frequentItemsets,
                     'associationRules'  => $rulesWithProducts,
                 ],
             ], 200);
@@ -128,9 +128,23 @@ class RecommendationController extends Controller
     //thuật toán đề xuất sản phẩm
     public function getRecommendations(Request $request)
     {
-        // Lấy và kiểm tra dữ liệu đầu vào
-        $cartItems = $request->input('cartItems', []);
+        // Lấy và kiểm tra dữ liệu đầu vào từ query string
+        $cartItemsString = $request->query('cartItems', '');
+        $cartItems       = ! empty($cartItemsString) ? explode(',', $cartItemsString) : [];
 
+        // Validate cartItems
+        if (! empty($cartItems)) {
+            foreach ($cartItems as $item) {
+                if (! is_numeric($item)) {
+                    return response()->json([
+                        'status'  => false,
+                        'message' => 'Cart items phải là các số nguyên',
+                    ], 400);
+                }
+            }
+        }
+
+        // Tiếp tục xử lý với cartItems đã được validate
         // Kiểm tra giỏ hàng rỗng
         if (empty($cartItems)) {
             return $this->getPopularProducts();
@@ -210,9 +224,9 @@ class RecommendationController extends Controller
         }
 
         return response()->json([
-            'status'             => true,
-            'message'            => 'Lấy danh sách sản phẩm đề xuất thành công',
-            'data'               => [
+            'status'  => true,
+            'message' => 'Lấy danh sách sản phẩm đề xuất thành công',
+            'data'    => [
                 'recommend_id'       => $recommendedIds,
                 'recommend_products' => $recommended_products,
             ],
@@ -228,16 +242,16 @@ class RecommendationController extends Controller
     // Hàm lấy sản phẩm phổ biến
     private function getPopularProducts()
     {
-        $popularProducts = Product::where('id', 3 )
+        $popularProducts = Product::where('id', 3)
             ->orWhere('id', 20)
             ->orWhere('id', 24)
             ->orWhere('id', 28)
             ->get();
 
         return response()->json([
-            'status'             => true,
-            'message'            => 'Đề xuất dựa trên sản phẩm phổ biến',
-            'data'               => [
+            'status'  => true,
+            'message' => 'Đề xuất dựa trên sản phẩm phổ biến',
+            'data'    => [
                 'recommend_products' => $popularProducts,
             ],
         ], 200);
@@ -282,9 +296,9 @@ class RecommendationController extends Controller
         }
 
         return response()->json([
-            'status'             => true,
-            'message'            => 'Lấy danh sách luật kết hợp thành công',
-            'data'               => [
+            'status'  => true,
+            'message' => 'Lấy danh sách luật kết hợp thành công',
+            'data'    => [
                 'associationRules' => $associationRules,
             ],
         ], 200);
