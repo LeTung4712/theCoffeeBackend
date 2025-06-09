@@ -93,4 +93,9 @@ class User extends Authenticatable implements JWTSubject
     {
         return $this->locked_until && now()->isBefore($this->locked_until);
     }
+
+    public function addressNotes()
+    {
+        return $this->hasMany(AddressNote::class);
+    }
 }

@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Payment;
-use App\Traits\JWTAuthTrait;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -13,7 +12,6 @@ use Illuminate\Support\Facades\Validator;
 
 class PaymentController extends Controller
 {
-    use JWTAuthTrait;
     //thanh toán qua momo
     public function execPostRequest($url, $data)
     {
@@ -71,11 +69,7 @@ class PaymentController extends Controller
     //=============================================== MOMO ================================================
     public function momo_payment(Request $request)
     {
-        // Kiểm tra xác thực
-        $authCheck = $this->checkUserAuth();
-        if ($authCheck !== true) {
-            return $authCheck;
-        }
+        $user = auth('user')->user();
 
         // Validate input
         $validator = Validator::make($request->all(), [
@@ -94,16 +88,14 @@ class PaymentController extends Controller
         try {
             DB::beginTransaction();
 
-            $user  = $this->getJWTAuthInfo()['user'];
             $order = Order::where('order_code', $request->order_code)->first();
 
             // Kiểm tra quyền sở hữu đơn hàng
-            $ownershipCheck = $this->checkResourceOwnership(
-                $order,
-                'Bạn không có quyền thanh toán đơn hàng này'
-            );
-            if ($ownershipCheck !== true) {
-                return $ownershipCheck;
+            if ($order->user_id != $user->id) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'Bạn không có quyền thanh toán đơn hàng này',
+                ], 403);
             }
 
             // Kiểm tra trạng thái đơn hàng
@@ -269,12 +261,7 @@ class PaymentController extends Controller
     //=============================================== VNPAY ================================================
     public function vnpay_payment(Request $request)
     {
-        // Kiểm tra xác thực
-        $authCheck = $this->checkUserAuth();
-        if ($authCheck !== true) {
-            return $authCheck;
-        }
-
+        $user = auth('user')->user();
         // Validate input
         $validator = Validator::make($request->all(), [
             'order_code' => 'required|string|exists:orders,order_code',
@@ -292,16 +279,14 @@ class PaymentController extends Controller
         try {
             DB::beginTransaction();
 
-            $user  = $this->getJWTAuthInfo()['user'];
             $order = Order::where('order_code', $request->order_code)->first();
 
             // Kiểm tra quyền sở hữu đơn hàng
-            $ownershipCheck = $this->checkResourceOwnership(
-                $order,
-                'Bạn không có quyền thanh toán đơn hàng này'
-            );
-            if ($ownershipCheck !== true) {
-                return $ownershipCheck;
+            if ($order->user_id != $user->id) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'Bạn không có quyền thanh toán đơn hàng này',
+                ], 403);
             }
 
             // Kiểm tra trạng thái đơn hàng
@@ -487,11 +472,7 @@ class PaymentController extends Controller
     //=============================================== ZALOPAY ================================================
     public function zalopay_payment(Request $request)
     {
-        // Kiểm tra xác thực
-        $authCheck = $this->checkUserAuth();
-        if ($authCheck !== true) {
-            return $authCheck;
-        }
+        $user = auth('user')->user();
 
         // Validate input
         $validator = Validator::make($request->all(), [
@@ -510,16 +491,14 @@ class PaymentController extends Controller
         try {
             DB::beginTransaction();
 
-            $user  = $this->getJWTAuthInfo()['user'];
             $order = Order::where('order_code', $request->order_code)->first();
 
             // Kiểm tra quyền sở hữu đơn hàng
-            $ownershipCheck = $this->checkResourceOwnership(
-                $order,
-                'Bạn không có quyền thanh toán đơn hàng này'
-            );
-            if ($ownershipCheck !== true) {
-                return $ownershipCheck;
+            if ($order->user_id != $user->id) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'Bạn không có quyền thanh toán đơn hàng này',
+                ], 403);
             }
 
             // Kiểm tra trạng thái đơn hàng
@@ -754,155 +733,6 @@ class PaymentController extends Controller
                 'return_message' => $e->getMessage(),
             ], 500);
         }
-    }
-
-    //=============================================== COD ================================================
-    public function cod_payment(Request $request)
-    {
-        // Kiểm tra xác thực
-        $authCheck = $this->checkUserAuth();
-        if ($authCheck !== true) {
-            return $authCheck;
-        }
-
-        // Validate input
-        $validator = Validator::make($request->all(), [
-            'order_code' => 'required|string|exists:orders,order_code',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'status'  => false,
-                'message' => 'Dữ liệu không hợp lệ',
-                'errors'  => $validator->errors(),
-            ], 422);
-        }
-
-        try {
-            DB::beginTransaction();
-
-            $user  = $this->getJWTAuthInfo()['user'];
-            $order = Order::where('order_code', $request->order_code)->first();
-
-            // Kiểm tra quyền sở hữu đơn hàng
-            $ownershipCheck = $this->checkResourceOwnership(
-                $order,
-                'Bạn không có quyền thanh toán đơn hàng này'
-            );
-            if ($ownershipCheck !== true) {
-                return $ownershipCheck;
-            }
-
-            // Kiểm tra phương thức thanh toán
-            if ($order->payment_method != 'cod') {
-                return response()->json([
-                    'status'  => false,
-                    'message' => 'Phương thức thanh toán không phù hợp',
-                ], 400);
-            }
-
-            // Kiểm tra trạng thái đơn hàng
-            if ($order->payment_status == '1') {
-                return response()->json([
-                    'status'  => false,
-                    'message' => 'Đơn hàng này đã được thanh toán',
-                ], 400);
-            }
-
-            if ($order->status != '0') {
-                return response()->json([
-                    'status'  => false,
-                    'message' => 'Đơn hàng không ở trạng thái chờ thanh toán',
-                ], 400);
-            }
-
-            // Tạo payment record
-            $payment = $this->createPayment(
-                $order,
-                $order->final_price,
-                'cod',
-                'pending'
-            );
-
-            DB::commit();
-            return response()->json([
-                'status'  => true,
-                'message' => 'Đã đánh dấu đơn hàng thanh toán khi nhận hàng',
-                'data'    => [
-                    'order_code' => $order->order_code,
-                ],
-            ], 200);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            \Log::error('COD payment exception', [
-                'order_code' => $request->order_code,
-                'error'      => $e->getMessage(),
-            ]);
-
-            return response()->json([
-                'status'  => false,
-                'message' => 'Có lỗi xảy ra khi xử lý thanh toán',
-            ], 500);
-        }
-    }
-
-    /**
-     * Cập nhật thanh toán COD khi đã giao hàng thành công
-     */
-    public function complete_cod_payment(Request $request)
-    {
-        // Tìm đơn hàng
-        $order = Order::where('order_code', $request->order_code)->first();
-        if (! $order) {
-            return response()->json([
-                'status'  => false,
-                'message' => 'Không tìm thấy đơn hàng',
-            ], 404);
-        }
-
-        // Kiểm tra phương thức thanh toán
-        if ($order->payment_method != 'cod') {
-            return response()->json([
-                'status'  => false,
-                'message' => 'Phương thức thanh toán không phải COD',
-            ], 400);
-        }
-
-        // Tìm payment chưa thanh toán
-        $payment = $order->payments()->where('status', 'pending')->first();
-
-        if ($payment) {
-            // Cập nhật payment
-            $payment->update([
-                'status'       => 'completed',
-                'payment_time' => Carbon::now(),
-                'notes'        => 'Thanh toán COD khi giao hàng',
-            ]);
-        } else {
-            // Tạo payment mới
-            $payment = $this->createPayment(
-                $order,
-                $order->final_price,
-                'cod',
-                'completed',
-                null,
-                null
-            );
-        }
-
-                                      // Cập nhật trạng thái thanh toán và trạng thái đơn hàng
-        $order->payment_status = '1'; // Đã thanh toán
-        $order->status         = '2'; // Đã hoàn thành
-        $order->save();
-
-        return response()->json([
-            'status'  => true,
-            'message' => 'Đã cập nhật thanh toán COD thành công',
-            'data'    => [
-                'order_code' => $order->order_code,
-            ],
-        ], 200);
     }
 
 }

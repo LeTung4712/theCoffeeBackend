@@ -12,10 +12,9 @@ class AnalyzeController extends Controller
     //thong ke
     public function getAnalyzeOrders(Request $request)
     {
-        $timeRange = $request->query('timeRange', 'week');
+        $timeRange = $request->timeRange;
         $startDate = $this->getStartDate($timeRange);
         $endDate   = now();
-
         // Lấy dữ liệu đơn hàng trong khoảng thời gian
         $orders = Order::where('created_at', '>=', $startDate)
             ->where('created_at', '<=', $endDate)
@@ -26,7 +25,7 @@ class AnalyzeController extends Controller
 
         // Tính toán các chỉ số thống kê
         $stats = [
-            'totalRevenue'    => (float) $orders->sum('final_price'),
+            'totalRevenue'    => (float) $orders->where('status', '2')->sum('final_price'),
             'totalOrders'     => $orders->count(),
             'completedOrders' => $orders->where('status', '2')->count(),
             'pendingOrders'   => $orders->whereIn('status', ['0', '1'])->count(),
@@ -44,7 +43,6 @@ class AnalyzeController extends Controller
             'orders'    => $previousOrders->count(),
             'customers' => $previousOrders->distinct('user_id')->count('user_id'),
         ];
-
         $growthRates = $this->calculateGrowthRates($stats, $previousStats);
 
         // Lấy top sản phẩm bán chạy
@@ -58,7 +56,7 @@ class AnalyzeController extends Controller
                 'revenueGrowth'            => $growthRates['revenue'],
                 'totalOrders'              => $stats['totalOrders'],
                 'orderGrowth'              => $growthRates['orders'],
-                'completionRate'           => $this->calculateCompletionRate($stats['completedOrders'], $stats['totalOrders']),
+                'completionRate'           => $this->calculateCompletionRate($stats['completedOrders'], $stats['completedOrders'] + $stats['canceledOrders']),
                 'newCustomers'             => $stats['newCustomers'],
                 'customerGrowth'           => $growthRates['customers'],
                 'topProducts'              => $topProducts,
@@ -100,7 +98,10 @@ class AnalyzeController extends Controller
 
     private function calculateGrowthRate($current, $previous)
     {
-        return $previous > 0 ? round((($current - $previous) / $previous) * 100, 2) : 0;
+        if ($previous == 0) {
+            return $current > 0 ? 100 : 0; // Nếu trước đó là 0 và hiện tại có giá trị thì tăng 100%, nếu vẫn là 0 thì tăng 0%
+        }
+        return round((($current - $previous) / $previous) * 100, 2);
     }
 
     private function calculateCompletionRate($completed, $total)
@@ -114,6 +115,7 @@ class AnalyzeController extends Controller
             ->join('products', 'products.id', '=', 'order_items.product_id')
             ->join('orders', 'orders.id', '=', 'order_items.order_id')
             ->whereBetween('orders.created_at', [$startDate, $endDate])
+            ->where('orders.status', '2')
             ->selectRaw('SUM(order_items.product_quantity) as soldCount, SUM(order_items.product_price * order_items.product_quantity) as revenue')
             ->groupBy('order_items.product_id', 'products.name', 'products.image_url')
             ->orderBy('soldCount', 'desc')
@@ -137,6 +139,7 @@ class AnalyzeController extends Controller
                 $startDate = now()->subMonths(11)->startOfMonth();
                 $revenues  = Order::where('created_at', '>=', $startDate)
                     ->where('created_at', '<=', $endDate)
+                    ->where('orders.status', '2')
                     ->selectRaw('MONTH(created_at) as month, YEAR(created_at) as year, SUM(final_price) as total_revenue')
                     ->groupBy('year', 'month')
                     ->orderBy('year')
@@ -162,6 +165,7 @@ class AnalyzeController extends Controller
                 $startDate = now()->subMonths(2)->startOfMonth();
                 $revenues  = Order::where('created_at', '>=', $startDate)
                     ->where('created_at', '<=', $endDate)
+                    ->where('orders.status', '2')
                     ->selectRaw('MONTH(created_at) as month, YEAR(created_at) as year, SUM(final_price) as total_revenue')
                     ->groupBy('year', 'month')
                     ->orderBy('year')
@@ -187,6 +191,7 @@ class AnalyzeController extends Controller
                 $startDate = now()->subDays(29)->startOfDay();
                 $revenues  = Order::where('created_at', '>=', $startDate)
                     ->where('created_at', '<=', $endDate)
+                    ->where('orders.status', '2')
                     ->selectRaw('DATE(created_at) as date, SUM(final_price) as total_revenue')
                     ->groupBy('date')
                     ->orderBy('date')
@@ -208,6 +213,7 @@ class AnalyzeController extends Controller
                 $startDate = now()->subDays(6)->startOfDay();
                 $revenues  = Order::where('created_at', '>=', $startDate)
                     ->where('created_at', '<=', $endDate)
+                    ->where('orders.status', '2')
                     ->selectRaw('DATE(created_at) as date, SUM(final_price) as total_revenue')
                     ->groupBy('date')
                     ->orderBy('date')
@@ -227,9 +233,9 @@ class AnalyzeController extends Controller
 
         return [
             'labels'      => $labels,
-            'revenueData' => $revenueData,
-            'costData'    => $costData,
-            'profitData'  => $profitData,
+            'revenueData' => $revenueData, //doanh thu
+            'costData'    => $costData,    //chi phí
+            'profitData'  => $profitData,  //lợi nhuận
         ];
     }
 }

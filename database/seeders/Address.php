@@ -21,7 +21,7 @@ class Address extends Seeder
                 'user_name' => 'Lê Thanh Tùng',
                 'address' => '409 Tam Trinh, Hoàng Văn Thụ, Hoàng Mai, Hà Nội',
                 'place_id' => 'opm4R7EounVwvWIkjnOgyECgYVSRcL2TQJI_Kad-18wGi2ZAuGHuyxStVx6mB7eSdtZIP3QHgZavn0grXFyR7pmnRg2fBJJwkExHU5FhkTfh0i1QHpweBkXajXHCRLOrR',
-                'mobile_no' => '00828035636',
+                'mobile_no' => '0828035636',
                 'address_type' => 'home',
                 'is_default' => 1,
                 'created_at' => '2023-01-01 00:00:00',

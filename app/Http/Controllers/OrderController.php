@@ -1,14 +1,12 @@
 <?php
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\Topping;
 use App\Models\Voucher;
 use App\Models\VoucherUsage;
-use App\Traits\JWTAuthTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -16,18 +14,23 @@ use Illuminate\Support\Str;
 
 class OrderController extends Controller
 {
-    use JWTAuthTrait;
+    //tạo mã đơn hàng
+    private function generateOrderCode($userId)
+    {
+        // timestamp dạng ymdHis: 20250612124530
+        $timestamp = now()->format('YmdHis');
+
+        // random 4 ký tự
+        $rand = strtoupper(Str::random(4));
+
+        // mã đơn: TCS-20250612-UID1-ABC4
+        return "TCS-{$timestamp}-U{$userId}-{$rand}";
+    }
 
     //them don hang
     public function addOrder(Request $request)
     {
-        // Kiểm tra xem có phải là user không
-        $authCheck = $this->checkUserAuth();
-        if ($authCheck !== true) {
-            return $authCheck;
-        }
-
-        $user = $this->getJWTAuthInfo()['user'];
+        $user = auth('user')->user();
 
         // Validate dữ liệu đầu vào
         $validator = Validator::make($request->all(), [
@@ -64,7 +67,7 @@ class OrderController extends Controller
                 // Tính giá sản phẩm theo size
                 $productPrice = $productInfo->price;
                 if ($product['size'] === 'M') {
-                    $productPrice += 5000;
+                    $productPrice += 6000;
                 } else if ($product['size'] === 'L') {
                     $productPrice += 10000;
                 }
@@ -97,15 +100,19 @@ class OrderController extends Controller
             // Xử lý voucher nếu có
             $discountAmount = 0;
             $voucher        = null;
-            if ($request->voucher_code) {
-                $voucher = Voucher::where('code', $request->voucher_code)
+            if ($request->filled('voucher_id')) {
+                $voucher = Voucher::where('id', $request->voucher_id)
                     ->where('active', true)
                     ->where('expire_at', '>', now())
                     ->whereRaw('total_quantity > used_quantity')
                     ->first();
 
                 if (! $voucher) {
-                    throw new \Exception('Mã voucher không hợp lệ hoặc đã hết hạn');
+                    \Log::error('Mã voucher không hợp lệ hoặc đã hết hạn');
+                    return response()->json([
+                        'status'  => false,
+                        'message' => 'Mã voucher không hợp lệ hoặc đã hết hạn',
+                    ], 400);
                 }
 
                 // Kiểm tra số lần sử dụng của user
@@ -114,12 +121,20 @@ class OrderController extends Controller
                     ->count();
 
                 if ($usageCount >= $voucher->limit_per_user) {
-                    throw new \Exception('Bạn đã sử dụng hết số lần cho phép của voucher này');
+                    \Log::error('Bạn đã sử dụng hết số lần cho phép của voucher này');
+                    return response()->json([
+                        'status'  => false,
+                        'message' => 'Bạn đã sử dụng hết số lần cho phép của voucher này',
+                    ], 400);
                 }
 
                 // Kiểm tra giá trị đơn hàng tối thiểu
                 if ($totalPrice < $voucher->min_order_amount) {
-                    throw new \Exception('Giá trị đơn hàng chưa đạt yêu cầu để sử dụng voucher');
+                    \Log::error('Giá trị đơn hàng chưa đạt yêu cầu để sử dụng voucher');
+                    return response()->json([
+                        'status'  => false,
+                        'message' => 'Giá trị đơn hàng chưa đạt yêu cầu để sử dụng voucher',
+                    ], 400);
                 }
 
                 // Tính toán số tiền giảm giá
@@ -137,9 +152,7 @@ class OrderController extends Controller
             }
 
             // Tạo mã đơn hàng duy nhất
-            do {
-                $orderCode = 'TCS' . $user->id . time() . strtoupper(Str::random(6));
-            } while (Order::where('order_code', $orderCode)->exists());
+            $orderCode = $this->generateOrderCode($user->id);
 
             // Tính toán giá cuối cùng
             $shippingFee = $request->shipping_fee ?? 0;
@@ -229,7 +242,7 @@ class OrderController extends Controller
         }
     }
 
-    //đơn hàng đang giao
+    //xác nhận đơn hàng đểđể giao
     public function startDelivery($id)
     {
         $order = Order::where('id', $id)->first();
@@ -269,20 +282,12 @@ class OrderController extends Controller
     /**
      * Xác nhận giao hàng/nhận hàng thành công
      */
-    public function successOrder($order_id)
+    public function successOrder(Request $request, $order_id)
     {
-        // Kiểm tra xác thực cho cả admin và user
-        $authInfo = $this->getJWTAuthInfo();
-        $user     = $authInfo['user'];
-        $isAdmin  = $authInfo['payload']->get('type') === 'admin';
-
-        // Nếu không phải admin thì kiểm tra quyền user
-        if (! $isAdmin) {
-            $authCheck = $this->checkUserAuth();
-            if ($authCheck !== true) {
-                return $authCheck;
-            }
-        }
+        // Lấy thông tin xác thực từ request đã được merge bởi middleware
+        $user    = $request->user;
+        $admin   = $request->admin;
+        $isAdmin = ! is_null($admin);
 
         $order = Order::find($order_id);
         if (! $order) {
@@ -294,24 +299,22 @@ class OrderController extends Controller
 
         // Nếu là user thông thường, kiểm tra quyền sở hữu
         if (! $isAdmin) {
-            $ownershipCheck = $this->checkResourceOwnership(
-                $order,
-                'Bạn không có quyền cập nhật đơn hàng này'
-            );
-            if ($ownershipCheck !== true) {
-                return $ownershipCheck;
+            if ($order->user_id !== $user->id) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'Bạn không có quyền hủy đơn hàng này',
+                ], 403);
+            }
+
+            // Kiểm tra trạng thái đơn hàng
+            if ($order->status !== '1') {
+                \Log::error('Lỗi khi cập nhật đơn hàng #' . $order_id . ': Đơn hàng không ở trạng thái "đang giao"');
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'Chỉ có thể xác nhận giao hàng khi đơn hàng đang ở trạng thái "đang giao"',
+                ], 400);
             }
         }
-
-        // Kiểm tra trạng thái đơn hàng
-        if ($order->status !== '1') {
-            \Log::error('Lỗi khi cập nhật đơn hàng #' . $order_id . ': Đơn hàng không ở trạng thái "đang giao"');
-            return response()->json([
-                'status'  => false,
-                'message' => 'Chỉ có thể xác nhận giao hàng khi đơn hàng đang ở trạng thái "đang giao"',
-            ], 400);
-        }
-
         try {
             DB::beginTransaction();
 
@@ -340,20 +343,12 @@ class OrderController extends Controller
     /**
      * Hủy đơn hàng
      */
-    public function cancelOrder($order_id)
+    public function cancelOrder(Request $request, $order_id)
     {
-        // Kiểm tra xác thực cho cả admin và user
-        $authInfo = $this->getJWTAuthInfo();
-        $user     = $authInfo['user'];
-        $isAdmin  = $authInfo['payload']->get('type') === 'admin';
-
-        // Nếu không phải admin thì kiểm tra quyền user
-        if (! $isAdmin) {
-            $authCheck = $this->checkUserAuth();
-            if ($authCheck !== true) {
-                return $authCheck;
-            }
-        }
+        // Lấy thông tin xác thực từ request đã được merge bởi middleware
+        $user    = $request->user;
+        $admin   = $request->admin;
+        $isAdmin = ! is_null($admin);
 
         $order = Order::find($order_id);
         if (! $order) {
@@ -363,14 +358,13 @@ class OrderController extends Controller
             ], 404);
         }
 
-        // Nếu là user thông thường, kiểm tra quyền sở hữu
+        // Nếu là user thông thường, kiểm tra quyền sở hữu và các điều kiện hủy đơn
         if (! $isAdmin) {
-            $ownershipCheck = $this->checkResourceOwnership(
-                $order,
-                'Bạn không có quyền hủy đơn hàng này'
-            );
-            if ($ownershipCheck !== true) {
-                return $ownershipCheck;
+            if ($order->user_id !== $user->id) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'Bạn không có quyền hủy đơn hàng này',
+                ], 403);
             }
 
             // Kiểm tra trạng thái đơn hàng (chỉ áp dụng cho user)
@@ -430,12 +424,7 @@ class OrderController extends Controller
     //xem cac don hang cua user
     public function getOrderHistory()
     {
-        $authCheck = $this->checkUserAuth();
-        if ($authCheck !== true) {
-            return $authCheck;
-        }
-
-        $user   = $this->getJWTAuthInfo()['user'];
+        $user   = auth('user')->user();
         $orders = Order::where('user_id', $user->id)
             ->orderby('id', 'desc')
             ->with('orderItems') // dùng eager loading để lấy thông tin chi tiết của đơn hàng

@@ -7,6 +7,7 @@ use App\Models\VerificationCode;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
@@ -44,7 +45,6 @@ class AuthUserController extends Controller
 
         $user = User::where('mobile_no', $request->mobile_no)->first();
 
-        // Kiểm tra tài khoản có bị khóa không
         if ($user && $user->isLocked()) {
             return response([
                 'status'  => false,
@@ -54,40 +54,33 @@ class AuthUserController extends Controller
 
         if (! $user) {
             $user = User::create([
+                'first_name'    => '',
                 'last_name'     => 'Guest',
                 'mobile_no'     => $request->mobile_no,
                 'date_of_birth' => DB::raw('CURRENT_TIMESTAMP'),
+                'email'         => '',
+                'is_active'     => true,
+                
             ]);
-
-            if (! $user) {
-                Log::error('Không thể tạo user mới', ['mobile_no' => $request->mobile_no]);
-                return response([
-                    'status'  => false,
-                    'message' => 'Đăng nhập thất bại',
-                ], 500);
-            }
         }
 
         $sendOtp = $this->sendSmsNotification($user);
 
         if ($sendOtp) {
-            Log::info('OTP đã được gửi', ['user_id' => $user->id]);
             return response([
                 'status'  => true,
                 'message' => 'OTP đã được gửi thành công',
-                //'sendOtp'     => $sendOtp,
             ], 200);
-        } else {
-            Log::error('Gửi OTP thất bại', ['user_id' => $user->id]);
-            return response([
-                'status'  => false,
-                'message' => 'Gửi OTP thất bại',
-            ], 500);
         }
+
+        return response([
+            'status'  => false,
+            'message' => 'Gửi OTP thất bại',
+        ], 500);
     }
 
     //dùng twilio để gửi mã otp
-    public function sendSmsNotification($user)
+    private function sendSmsNotification($user)
     {
         $account_sid        = getenv("TWILIO_SID");
         $auth_token         = getenv("TWILIO_TOKEN");
@@ -99,31 +92,32 @@ class AuthUserController extends Controller
         $otp            = $this->generate($user);
         $message        = 'Your OTP to login The Coffee Shop is: ' . $otp;
 
-        $result = $client->messages->create($receiverNumber, [
+        return $client->messages->create($receiverNumber, [
             'from' => $twilio_number,
             'body' => $message,
         ]);
-        return $result;
     }
+
     //
-    public function generate($user)
+    private function generate($user)
     {
         $verificationCode = $this->generateOtp($user);
         return $verificationCode->otp;
     }
 
     //tạo mã otp trong database và có hiệu lực trong 3 phút
-    public function generateOtp($user)
+    private function generateOtp($user)
     {
         // kiểm tra xem có mã otp nào trong database không và lấy mã otp mới nhất
-        $verificationCode = VerificationCode::where('user_id', $user->id)->latest()->first();
-        // lấy thời gian hiện tại
-        $now = Carbon::now();
-                                                                                 // nếu có mã otp và mã otp đó vẫn còn hiệu lực thì trả về mã otp đó
-        if ($verificationCode && $now->isBefore($verificationCode->expire_at)) { //now()->isBefore : kiểm tra xem thời gian hiện tại có trước thời gian hết hạn của mã otp không
+        $verificationCode = VerificationCode::where('user_id', $user->id)
+            ->where('expire_at', '>', Carbon::now())
+            ->latest()
+            ->first();
 
+        if ($verificationCode) {
             return $verificationCode;
         }
+
         // nếu không có mã otp hoặc mã otp đó đã hết hiệu lực thì tạo mã otp mới
         return VerificationCode::create([
             'user_id'   => $user->id,
@@ -131,6 +125,7 @@ class AuthUserController extends Controller
             'expire_at' => Carbon::now()->addMinutes(30), // thời gian hết hạn = thời gian hiện tại + 3 phút
         ]);
     }
+
     //kiểm tra mã otp
     public function checkOtp(Request $request)
     {
@@ -170,46 +165,41 @@ class AuthUserController extends Controller
             ->latest()
             ->first();
 
-        if (! $verificationCode) {
+        if (! $verificationCode || $verificationCode->otp !== $request->otp) {
             $user->incrementLoginAttempts();
             return response([
                 'status'  => false,
-                'message' => 'Mã OTP không hợp lệ',
-            ], 400);
-        }
-
-        $now = Carbon::now();
-        if (strcmp($verificationCode->otp, $request->otp) != 0) {
-            $user->incrementLoginAttempts();
-            return response([
-                'status'  => false,
-                'message' => 'Mã OTP không chính xác',
-            ], 400);
-        }
-
-        if ($now->isAfter($verificationCode->expire_at)) {
-            return response([
-                'status'  => false,
-                'message' => 'Mã OTP đã hết hạn',
+                'message' => 'Mã OTP không hợp lệ hoặc đã hết hạn',
             ], 400);
         }
 
         // Reset login attempts và tạo token
         $user->resetLoginAttempts();
 
-        // Tạo JWT token
-        $token = JWTAuth::fromUser($user);
+        // Tạo JWT token với type là user
+        $token = JWTAuth::claims(['type' => 'user'])->fromUser($user);
 
         // Tạo refresh token
         $refreshToken       = Str::random(64);
         $refreshTokenExpiry = Carbon::now()->addDays(self::REFRESH_TOKEN_EXPIRY_DAYS);
 
-        // Lưu tokens vào database
+        // Lưu refresh token vào database
         $user->update([
             'access_token'             => $token,
-            'refresh_token'            => $refreshToken,
+            'refresh_token'            => Hash::make($refreshToken), // Hash refresh token trước khi lưu
             'refresh_token_expired_at' => $refreshTokenExpiry,
         ]);
+
+        // Tạo cookie chứa refresh token
+        $cookie = cookie(
+            'refresh_token',
+            $refreshToken,
+            self::REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60, // Thời gian sống của cookie (phút)
+            '/',                                       // Path
+            null,                                      // Domain
+            true,                                      // Secure
+            true                                       // HttpOnly
+        );
 
         Log::info('Đăng nhập thành công', ['user_id' => $user->id]);
 
@@ -217,22 +207,20 @@ class AuthUserController extends Controller
             'status'  => true,
             'message' => 'Đăng nhập thành công',
             'data'    => [
-                'userInfo'                 => $user,
-                'access_token'             => $token,
-                'refresh_token'            => $refreshToken,
-                'token_type'               => 'bearer',
-                'expires_in'               => config('jwt.ttl') * 60,
-                'refresh_token_expires_in' => self::REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60,
+                'userInfo'     => $user,
+                'access_token' => $token,
+                'token_type'   => 'bearer',
+                'expires_in'   => config('jwt.ttl') * 60,
             ],
-        ], 200);
+        ])->cookie($cookie);
     }
 
     //đăng xuất
-    public function logout()
+    public function logout(Request $request)
     {
         try {
-            // Lấy user từ JWT token hiện tại
-            $user = auth()->user();
+            // Lấy user từ request đã được merge bởi middleware
+            $user = $request->user;
 
             if (! $user) {
                 return response()->json([
@@ -241,20 +229,23 @@ class AuthUserController extends Controller
                 ], 401);
             }
 
-            // Xóa tokens
+            // Xóa tokens trong database
             $user->update([
                 'access_token'             => null,
                 'refresh_token'            => null,
                 'refresh_token_expired_at' => null,
             ]);
 
-            // Logout khỏi JWT và trả về JSON response
+            // Xóa cookie refresh token
+            $cookie = cookie()->forget('refresh_token');
+
+            // Logout khỏi JWT
             auth()->logout();
 
             return response()->json([
                 'status'  => true,
                 'message' => 'Đăng xuất thành công',
-            ], 200);
+            ], 200)->withCookie($cookie);
 
         } catch (\Exception $e) {
             Log::error('Lỗi đăng xuất', [
@@ -272,20 +263,22 @@ class AuthUserController extends Controller
     public function refreshToken(Request $request)
     {
         try {
-            $validator = validator($request->all(), [
-                'refresh_token' => 'required|string',
-            ]);
-
-            if ($validator->fails()) {
+            // Lấy refresh token từ cookie
+            $refreshToken = $request->cookie('refresh_token');
+            if (! $refreshToken) {
                 return response([
                     'status'  => false,
-                    'message' => 'Refresh token không hợp lệ',
-                ], 422);
+                    'message' => 'Refresh token không tồn tại',
+                ], 401);
             }
 
-            $user = User::where('refresh_token', $request->refresh_token)
-                ->where('refresh_token_expired_at', '>', Carbon::now())
-                ->first();
+            // Tìm user có refresh token tương ứng
+            $user = User::where('refresh_token_expired_at', '>', Carbon::now())
+                ->whereNotNull('refresh_token')
+                ->get()
+                ->first(function ($user) use ($refreshToken) {
+                    return Hash::check($refreshToken, $user->refresh_token);
+                });
 
             if (! $user) {
                 return response([
@@ -294,28 +287,63 @@ class AuthUserController extends Controller
                 ], 401);
             }
 
-            // Chỉ tạo JWT token mới
-            $token = JWTAuth::fromUser($user);
+            // Kiểm tra thời gian hết hạn
+            $expiredAt = Carbon::parse($user->refresh_token_expired_at);
+            if ($expiredAt->isPast()) {
+                // Nếu đã hết hạn thì tạo mới refresh token
+                $newRefreshToken = Str::random(64);
+                $newExpiredAt    = Carbon::now()->addDays(self::REFRESH_TOKEN_EXPIRY_DAYS);
 
-            // Chỉ cập nhật JWT token mới
-            $user->update([
-                'access_token' => $token,
+                $user->update([
+                    'refresh_token'            => Hash::make($newRefreshToken),
+                    'refresh_token_expired_at' => $newExpiredAt,
+                ]);
+
+                // Tạo cookie mới
+                $cookie = cookie(
+                    'refresh_token',
+                    $newRefreshToken,
+                    self::REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60,
+                    '/',
+                    true,
+                    true
+                );
+            } else {
+                // Nếu chưa hết hạn thì giữ nguyên refresh token cũ
+                $cookie = cookie(
+                    'refresh_token',
+                    $refreshToken,
+                    Carbon::now()->diffInMinutes($expiredAt),
+                    '/',
+                    true,
+                    true
+                );
+            }
+
+            // Tạo access token mới
+            $token = JWTAuth::claims(['type' => 'user'])->fromUser($user);
+            $user->update(['access_token' => $token]);
+
+            Log::info('Refresh token thành công', [
+                'user_id'    => $user->id,
+                'expires_at' => $expiredAt,
             ]);
 
-            Log::info('Refresh token thành công', ['user_id' => $user->id]);
-
             return response([
-                'status'       => true,
-                'message'      => 'Refresh token thành công',
-                'data'         => [
+                'status'  => true,
+                'message' => 'Refresh token thành công',
+                'data'    => [
                     'access_token' => $token,
                     'token_type'   => 'bearer',
                     'expires_in'   => config('jwt.ttl') * 60,
                 ],
-            ], 200);
+            ], 200)->cookie($cookie);
 
         } catch (\Exception $e) {
-            Log::error('Lỗi refresh token', ['error' => $e->getMessage()]);
+            Log::error('Lỗi refresh token', [
+                'error'   => $e->getMessage(),
+                'user_id' => auth()->id() ?? 'unknown',
+            ]);
             return response([
                 'status'  => false,
                 'message' => 'Không thể refresh token',

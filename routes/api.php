@@ -36,11 +36,12 @@ Route::group(['prefix' => 'v1'], function () {
     Route::group(['prefix' => 'admin'], function () {
         // Auth routes
         Route::post('auth/login', [AuthAdminController::class, 'login']);
-        Route::post('auth/refresh-token', [AuthAdminController::class, 'refreshToken']);
         Route::post('auth/logout', [AuthAdminController::class, 'logout']);
+        Route::post('auth/refresh-token', [AuthAdminController::class, 'refreshToken']);
 
         // Protected routes
         Route::middleware('auth.admin')->group(function () {
+
             // Categories
             Route::get('categories', [CategoryController::class, 'index']);
             Route::post('categories', [CategoryController::class, 'create']);
@@ -68,7 +69,7 @@ Route::group(['prefix' => 'v1'], function () {
             Route::put('vouchers/{id}', [VoucherController::class, 'update']);
             Route::delete('vouchers/{id}', [VoucherController::class, 'delete']);
 
-            // Orders
+            // Orders - Admin routes
             Route::get('orders', [OrderController::class, 'index']);
             Route::get('orders/{id}', [OrderController::class, 'getOrderInfo']);
             Route::patch('orders/{id}/start-delivery', [OrderController::class, 'startDelivery']);
@@ -79,12 +80,12 @@ Route::group(['prefix' => 'v1'], function () {
             Route::get('orders/status/pending-payment', [OrderController::class, 'getPendingPaymentOrders']);
             Route::get('orders/status/pending-delivery', [OrderController::class, 'getPendingDeliveryOrders']);
             Route::get('orders/status/delivering', [OrderController::class, 'getDeliveringOrders']);
-            Route::get('orders/analytics', [AnalyzeController::class, 'getAnalyzeOrders']);
+            Route::post('analytics', [AnalyzeController::class, 'getAnalyzeOrders']);
 
-            // Recommender 
+            // Recommender
             Route::post('recommender/analyze-shopping', [RecommendationController::class, 'getAnalyzeShoppingBehavior']);
             Route::get('recommender/association-rules', [RecommendationController::class, 'getAssociationRules']);
-            
+
         });
     });
 
@@ -100,14 +101,14 @@ Route::group(['prefix' => 'v1'], function () {
             Route::post('auth/logout', [AuthUserController::class, 'logout']);
 
             // User profile
-            Route::get('me', [UserController::class, 'me']);
-            Route::put('me', [UserController::class, 'updateInfo']);
+            Route::get('me', [UserController::class, 'getProfile']);
+            Route::put('me', [UserController::class, 'updateProfile']);
 
             // Addresses
-            Route::get('addresses', [AddressNoteController::class, 'getAddressNote']);
-            Route::post('addresses', [AddressNoteController::class, 'createAddressNote']);
-            Route::put('addresses/{id}', [AddressNoteController::class, 'updateAddressNote']);
-            Route::delete('addresses/{id}', [AddressNoteController::class, 'deleteAddressNote']);
+            Route::get('addresses', [AddressNoteController::class, 'show']);
+            Route::post('addresses', [AddressNoteController::class, 'create']);
+            Route::put('addresses/{id}', [AddressNoteController::class, 'update']);
+            Route::delete('addresses/{id}', [AddressNoteController::class, 'delete']);
 
             // Vouchers
             Route::get('vouchers', [VoucherController::class, 'indexActiveForUser']);
@@ -115,10 +116,8 @@ Route::group(['prefix' => 'v1'], function () {
             // Orders
             Route::post('orders', [OrderController::class, 'addOrder']);
             Route::get('orders', [OrderController::class, 'getOrderHistory']);
-            Route::middleware(['check.order.owner'])->group(function () {
-                Route::patch('orders/{id}/complete', [OrderController::class, 'successOrder']);
-                Route::patch('orders/{id}/cancel', [OrderController::class, 'cancelOrder']);
-            });
+            Route::patch('orders/{id}/complete', [OrderController::class, 'successOrder']);
+            Route::patch('orders/{id}/cancel', [OrderController::class, 'cancelOrder']);
         });
     });
 
@@ -141,6 +140,7 @@ Route::group(['prefix' => 'v1'], function () {
     //Public routes
     Route::get('products', [ProductController::class, 'indexActive']);
     Route::get('products/{id}', [ProductController::class, 'getProductInfo']);
+    Route::get('categories/{categoryId}/products', [ProductController::class, 'indexByCategoryId']);
     Route::get('categories', [CategoryController::class, 'indexActive']);
     Route::get('toppings', [ToppingController::class, 'indexActive']);
     Route::get('vouchers', [VoucherController::class, 'indexActive']);

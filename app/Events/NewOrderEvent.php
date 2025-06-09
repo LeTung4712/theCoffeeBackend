@@ -48,6 +48,7 @@ class NewOrderEvent implements ShouldBroadcast
     public function broadcastWith(): array
     {
         return [
+            'order_id'    => $this->order->id,
             'order_code'  => $this->order->order_code,
             'user_name'   => $this->order->user_name,
             'total_price' => $this->order->total_price,

@@ -15,6 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('voucher_id')->constrained()->onDelete('restrict'); // khi voucher bị xóa thì voucher usage vẫn còn   
             $table->foreignId('user_id')->constrained()->onDelete('cascade'); // khi user bị xóa thì tất cả các voucher usage của user cũng sẽ bị xóa
+            $table->foreignId('order_id')->constrained()->onDelete('cascade'); // khi đơn hàng bị xóa thì tất cả các voucher usage của đơn hàng cũng sẽ bị xóa
             $table->timestamps();
         });
     }

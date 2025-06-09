@@ -3,7 +3,9 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\Category;
+use App\Models\Product;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class CategoryController extends Controller
 {
@@ -12,7 +14,10 @@ class CategoryController extends Controller
     public function create(Request $request)
     {
         if (Category::where('name', $request->name)->exists()) {
-            return response(['message' => 'Đã có danh mục này'], 409);
+            return response()->json([
+                'status'  => false,
+                'message' => 'Đã có danh mục này',
+            ], 409);
         }
 
         $category = Category::create([
@@ -42,20 +47,51 @@ class CategoryController extends Controller
         $category = Category::find($id);
 
         if (! $category) {
-            return response()->json(['message' => 'Không có danh mục'], 404);
+            return response()->json([
+                'status'  => false,
+                'message' => 'Không tìm thấy danh mục',
+            ], 404);
         }
 
-        $result = Category::where('id', $id)->orWhere('parent_id', $id)->delete();
+        try {
+            // Lấy tất cả danh mục con
+            $childCategories = Category::where('parent_id', $id)->get();
+            $categoryIds     = array_merge([$id], $childCategories->pluck('id')->toArray());
 
-        return $result
-        ? response()->json([
-            'status'  => true,
-            'message' => 'Xóa thành công danh mục',
-        ], 200)
-        : response()->json([
-            'status'  => false,
-            'message' => 'Xóa thành công không danh mục',
-        ], 400);
+            // Kiểm tra xem có sản phẩm nào thuộc danh mục này hoặc danh mục con không
+            $hasProducts = Product::whereIn('category_id', $categoryIds)->exists();
+
+            if ($hasProducts) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'Không thể xóa danh mục vì đang có sản phẩm thuộc danh mục này',
+                ], 400);
+            }
+
+            DB::beginTransaction();
+
+            // Xóa danh mục con trước
+            if ($childCategories->isNotEmpty()) {
+                Category::whereIn('id', $childCategories->pluck('id'))->delete();
+            }
+
+            // Sau đó mới xóa danh mục cha
+            $category->delete();
+
+            DB::commit();
+
+            return response()->json([
+                'status'  => true,
+                'message' => 'Xóa danh mục thành công',
+            ], 200);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'status'  => false,
+                'message' => 'Không thể xóa danh mục: ' . $e->getMessage(),
+            ], 500);
+        }
     }
 
     // Get all categories
@@ -135,7 +171,10 @@ class CategoryController extends Controller
         $category = Category::find($id);
 
         if (! $category) {
-            return response(['message' => 'Không có danh mục'], 404);
+            return response()->json([
+                'status'  => false,
+                'message' => 'Không có danh mục',
+            ], 404);
         }
 
         $category->update([
