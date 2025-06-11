@@ -29,6 +29,4 @@ jobs:
 
             find storage bootstrap/cache -type f -exec chmod 664 {} \;
             find storage bootstrap/cache -type d -exec chmod 775 {} \;
-            
-            sudo systemctl restart php8.1-fpm
-            sudo systemctl restart nginx
+
