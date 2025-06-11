@@ -33,9 +33,9 @@ use Illuminate\Support\Facades\Route;
  */
 Route::group(['prefix' => 'v1'], function () {
     // Admin routes
-    Route::group(['prefix' => 'admin'], function () {
+        Route::group(['prefix' => 'admin'], function () {
         // Auth routes
-        Route::post('auth/login', [AuthAdminController::class, 'login']);
+            Route::post('auth/login', [AuthAdminController::class, 'login']);
         Route::post('auth/logout', [AuthAdminController::class, 'logout']);
         Route::post('auth/refresh-token', [AuthAdminController::class, 'refreshToken']);
 

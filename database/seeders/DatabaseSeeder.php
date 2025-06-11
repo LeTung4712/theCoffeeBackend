@@ -1,5 +1,4 @@
 <?php
-
 namespace Database\Seeders;
 
 // use Illuminate\Database\Console\Seeds\WithoutModelEvents;
@@ -12,12 +11,15 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        $this -> call(Admins::class);
-        $this -> call(Users::class);
-        $this -> call(Address::class);
-        $this -> call(Toppings::class);
-        $this -> call(Categories::class);
-        $this -> call(Vouchers::class);
-        
+        $this->call([
+            Admins::class,
+            Users::class,
+            Address::class,
+            Toppings::class,
+            Categories::class,
+            Products::class,
+            Vouchers::class,
+            ToppingProducts::class,
+        ]);
     }
 }

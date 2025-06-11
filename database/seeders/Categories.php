@@ -203,6 +203,24 @@ class Categories extends Seeder
                 'created_at' => '2023-09-01 00:00:00',
                 'updated_at' => '2023-09-01 00:00:00' 
             ],
+            [
+                'id' => 22,
+                'name' => 'Matcha',
+                'parent_id' => null,
+                'image_url' => 'https://minio.thecoffeehouse.com/image/admin/1736415059_traxanh1.png',
+                'active' => true,
+                'created_at' => '2023-09-01 00:00:00',
+                'updated_at' => '2023-09-01 00:00:00' 
+            ],
+            [
+                'id' => 23,
+                'name' => 'Matcha Tây Bắc',
+                'parent_id' => 22,
+                'image_url' => '',
+                'active' => true,
+                'created_at' => '2023-09-01 00:00:00',
+                'updated_at' => '2023-09-01 00:00:00' 
+            ]   
         ];  
         //Category::truncate(); 
         Category::insert($data);
