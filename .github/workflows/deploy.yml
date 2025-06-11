@@ -7,7 +7,6 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
 
     steps:
       - uses: actions/checkout@v3
@@ -21,11 +20,15 @@ jobs:
           script: |
             cd /var/www/deploy-thecoffeeshop/theCoffeeBackend
             git pull origin main
-            composer install --no-dev --optimize-autoloader
+            composer install --no-interaction --prefer-dist --optimize-autoloader
             php artisan config:clear
             php artisan cache:clear
             php artisan config:cache
             php artisan route:cache
             php artisan view:cache
+
+            find storage bootstrap/cache -type f -exec chmod 664 {} \;
+            find storage bootstrap/cache -type d -exec chmod 775 {} \;
+            
             sudo systemctl restart php8.1-fpm
             sudo systemctl restart nginx
