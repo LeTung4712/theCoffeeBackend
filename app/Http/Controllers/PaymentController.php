@@ -115,7 +115,7 @@ class PaymentController extends Controller
                 'secretKey'   => env('MOMO_SECRET_KEY'),
                 'storeId'     => env('MOMO_STORE_ID'),
             ];
-
+            \Log::info('MOMO config', $config);
             // Tạo mã giao dịch duy nhất
             $uniqueTransactionId = $order->order_code . '_' . time();
 
