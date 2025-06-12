@@ -108,7 +108,13 @@ class PaymentController extends Controller
             }
 
             // Cấu hình MOMO
-            $config = config('services.momo');
+            $config = [
+                'endpoint'    => config('services.momo.endpoint'),
+                'partnerCode' => config('services.momo.partner_code'),
+                'accessKey'   => config('services.momo.access_key'),
+                'secretKey'   => config('services.momo.secret_key'),
+                'storeId'     => config('services.momo.store_id'),
+            ];
             \Log::info('MOMO config', $config);
             // Tạo mã giao dịch duy nhất
             $uniqueTransactionId = $order->order_code . '_' . time();
@@ -120,9 +126,9 @@ class PaymentController extends Controller
 
             // Tạo payload cho request
             $payload = [
-                'partnerCode' => config('services.momo.partner_code'),
+                'partnerCode' => $config['partnerCode'],
                 'partnerName' => env('APP_NAME', 'Test'),
-                'storeId'     => config('services.momo.store_id'),
+                'storeId'     => $config['storeId'],
                 'requestId'   => time() . "",
                 'amount'      => (int) $order->final_price,
                 'orderId'     => $uniqueTransactionId,
@@ -135,15 +141,15 @@ class PaymentController extends Controller
             ];
 
             // Tạo chữ ký
-            $rawHash = "accessKey={config('services.momo.access_key')}&amount={$payload['amount']}&extraData={$payload['extraData']}"
+            $rawHash = "accessKey={$config['accessKey']}&amount={$payload['amount']}&extraData={$payload['extraData']}"
                 . "&ipnUrl={$payload['ipnUrl']}&orderId={$payload['orderId']}&orderInfo={$payload['orderInfo']}"
                 . "&partnerCode={$payload['partnerCode']}&redirectUrl={$payload['redirectUrl']}"
                 . "&requestId={$payload['requestId']}&requestType={$payload['requestType']}";
 
-            $payload['signature'] = hash_hmac("sha256", $rawHash, config('services.momo.secret_key'));
+            $payload['signature'] = hash_hmac("sha256", $rawHash, $config['secretKey']);
 
             // Gọi API MOMO
-            $result     = $this->execPostRequest(config('services.momo.endpoint'), json_encode($payload));
+            $result     = $this->execPostRequest($config['endpoint'], json_encode($payload));
             $jsonResult = json_decode($result, true);
 
             if (! isset($jsonResult['payUrl'])) {
