@@ -35,4 +35,25 @@ return [
         'api_key' => env('GOONG_API_KEY'),
     ],
 
+    'momo'     => [
+        'endpoint'     => env('MOMO_ENDPOINT'),
+        'partner_code' => env('MOMO_PARTNER_CODE'),
+        'access_key'   => env('MOMO_ACCESS_KEY'),
+        'secret_key'   => env('MOMO_SECRET_KEY'),
+        'store_id'     => env('MOMO_STORE_ID'),
+    ],
+
+    'vnpay'    => [
+        'url'         => env('VNPAY_URL'),
+        'tmn_code'    => env('VNPAY_TMN_CODE'),
+        'hash_secret' => env('VNPAY_HASH_SECRET'),
+    ],
+
+    'zalopay'  => [
+        'app_id'   => env('ZALOPAY_APP_ID'),
+        'key1'     => env('ZALOPAY_KEY1'),
+        'key2'     => env('ZALOPAY_KEY2'),
+        'endpoint' => env('ZALOPAY_ENDPOINT'),
+    ],
+
 ];

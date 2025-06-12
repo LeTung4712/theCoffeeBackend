@@ -108,13 +108,7 @@ class PaymentController extends Controller
             }
 
             // Cấu hình MOMO
-            $config = [
-                'endpoint'    => env('MOMO_ENDPOINT', 'https://test-payment.momo.vn/v2/gateway/api/create'),
-                'partnerCode' => env('MOMO_PARTNER_CODE'),
-                'accessKey'   => env('MOMO_ACCESS_KEY'),
-                'secretKey'   => env('MOMO_SECRET_KEY'),
-                'storeId'     => env('MOMO_STORE_ID'),
-            ];
+            $config = config('services.momo');
             \Log::info('MOMO config', $config);
             // Tạo mã giao dịch duy nhất
             $uniqueTransactionId = $order->order_code . '_' . time();
@@ -305,9 +299,9 @@ class PaymentController extends Controller
             }
 
             // Cấu hình VNPay
-            $vnp_Url        = env('VNPAY_URL', 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html');
-            $vnp_TmnCode    = env('VNPAY_TMN_CODE');
-            $vnp_HashSecret = env('VNPAY_HASH_SECRET');
+            $vnp_Url        = config('services.vnpay.url');
+            $vnp_TmnCode    = config('services.vnpay.tmn_code');
+            $vnp_HashSecret = config('services.vnpay.hash_secret');
 
             // Tạo mã giao dịch duy nhất
             $vnp_TxnRef = $order->order_code . '_' . time();
@@ -388,7 +382,7 @@ class PaymentController extends Controller
         try {
             DB::beginTransaction();
 
-            $vnp_HashSecret = env('VNPAY_HASH_SECRET');
+            $vnp_HashSecret = config('services.vnpay.hash_secret');
             $inputData      = [];
             $data           = $request->all();
 
@@ -517,18 +511,13 @@ class PaymentController extends Controller
             }
 
             // Cấu hình ZaloPay
-            $config = [
-                'app_id'   => env('ZALOPAY_APP_ID', '255353'),
-                'key1'     => env('ZALOPAY_KEY1', 'PcY4iZIKFCIdgZvA6ueMcMHHUbRLYjPL'),
-                'key2'     => env('ZALOPAY_KEY2', 'kLtgPl8HHhfvMuDHPwKfgfsY4Ydm9eIz'),
-                'endpoint' => env('ZALOPAY_ENDPOINT', 'https://sb-openapi.zalopay.vn/v2/create'),
-            ];
+            $config = config('services.zalopay');
 
             $now          = Carbon::now('Asia/Ho_Chi_Minh');
             $app_trans_id = $now->format('ymd') . '_' . $order->order_code . '_' . round(microtime(true) * 1000);
 
             // Tạo payment record
-            $payment = $this->createPayment($order, $order->final_price, 'zalopay');
+            $payment                 = $this->createPayment($order, $order->final_price, 'zalopay');
             $payment->transaction_id = $app_trans_id;
             $payment->save();
 
@@ -627,7 +616,7 @@ class PaymentController extends Controller
         try {
             DB::beginTransaction();
 
-            $key2 = env('ZALOPAY_KEY2');
+            $key2 = config('services.zalopay.key2');
             $data = $request->all();
             $mac  = $data['mac'];
             unset($data['mac']);
@@ -714,8 +703,8 @@ class PaymentController extends Controller
      */
     public function zalopay_check_status(Request $request)
     {
-        $app_id   = env('ZALOPAY_APP_ID', '2553');
-        $key1     = env('ZALOPAY_KEY1', 'PcY4iZIKFCIdgZvA6ueMcMHHUbRLYjPL');
+        $app_id   = config('services.zalopay.app_id');
+        $key1     = config('services.zalopay.key1');
         $endpoint = "https://sandbox.zalopay.com.vn/v001/tpe/getstatusbyapptransid";
 
         $data = [
