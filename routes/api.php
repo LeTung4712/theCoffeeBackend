@@ -41,6 +41,8 @@ Route::group(['prefix' => 'v1'], function () {
 
         // Protected routes
         Route::middleware('auth.admin')->group(function () {
+            //verification
+            Route::get('verification', [AuthUserController::class, 'showVerification']);
 
             // Categories
             Route::get('categories', [CategoryController::class, 'index']);

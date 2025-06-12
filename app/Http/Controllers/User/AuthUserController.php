@@ -60,7 +60,7 @@ class AuthUserController extends Controller
                 'date_of_birth' => DB::raw('CURRENT_TIMESTAMP'),
                 'email'         => '',
                 'is_active'     => true,
-                
+
             ]);
         }
 
@@ -82,48 +82,86 @@ class AuthUserController extends Controller
     //dùng twilio để gửi mã otp
     private function sendSmsNotification($user)
     {
-        $account_sid        = getenv("TWILIO_SID");
-        $auth_token         = getenv("TWILIO_TOKEN");
-        $twilio_number      = getenv("TWILIO_FROM");
-        $twilio_service_sid = getenv("TWILIO_SERVICE_SID");
-        $client             = new Client($account_sid, $auth_token);
-        // Chuyển đổi số điện thoại từ 0 sang +84
-        $receiverNumber = '+84' . substr($user->mobile_no, 1);
-        $otp            = $this->generate($user);
-        $message        = 'Your OTP to login The Coffee Shop is: ' . $otp;
+        try {
+            // Tạo OTP trước
+            $otp = $this->generate($user);
 
-        return $client->messages->create($receiverNumber, [
-            'from' => $twilio_number,
-            'body' => $message,
-        ]);
+            // Sau đó mới gửi SMS
+            $account_sid        = getenv("TWILIO_SID");
+            $auth_token         = getenv("TWILIO_TOKEN");
+            $twilio_number      = getenv("TWILIO_FROM");
+            $twilio_service_sid = getenv("TWILIO_SERVICE_SID");
+
+            if (! $account_sid || ! $auth_token || ! $twilio_number) {
+                Log::error('Twilio credentials missing', [
+                    'user_id'   => $user->id,
+                    'mobile_no' => $user->mobile_no,
+                ]);
+                return true; // Vẫn trả về true vì OTP đã được tạo
+            }
+
+            $client         = new Client($account_sid, $auth_token);
+            $receiverNumber = '+84' . substr($user->mobile_no, 1);
+            $message        = 'Your OTP to login The Coffee Shop is: ' . $otp;
+
+            $client->messages->create($receiverNumber, [
+                'from' => $twilio_number,
+                'body' => $message,
+            ]);
+
+            return true;
+        } catch (\Exception $e) {
+            Log::error('Twilio SMS sending failed', [
+                'error'     => $e->getMessage(),
+                'user_id'   => $user->id,
+                'mobile_no' => $user->mobile_no,
+            ]);
+            return true; // Vẫn trả về true vì OTP đã được tạo
+        }
     }
 
     //
     private function generate($user)
     {
-        $verificationCode = $this->generateOtp($user);
-        return $verificationCode->otp;
+        try {
+            $verificationCode = $this->generateOtp($user);
+            return $verificationCode->otp;
+        } catch (\Exception $e) {
+            Log::error('OTP generation failed', [
+                'error'   => $e->getMessage(),
+                'user_id' => $user->id,
+            ]);
+            throw $e; // Ném lỗi vì đây là lỗi nghiêm trọng
+        }
     }
 
     //tạo mã otp trong database và có hiệu lực trong 3 phút
     private function generateOtp($user)
     {
-        // kiểm tra xem có mã otp nào trong database không và lấy mã otp mới nhất
-        $verificationCode = VerificationCode::where('user_id', $user->id)
-            ->where('expire_at', '>', Carbon::now())
-            ->latest()
-            ->first();
+        try {
+            // Kiểm tra xem có mã otp nào trong database không và lấy mã otp mới nhất
+            $verificationCode = VerificationCode::where('user_id', $user->id)
+                ->where('expire_at', '>', Carbon::now())
+                ->latest()
+                ->first();
 
-        if ($verificationCode) {
-            return $verificationCode;
+            if ($verificationCode) {
+                return $verificationCode;
+            }
+
+            // Nếu không có mã otp hoặc mã otp đó đã hết hiệu lực thì tạo mã otp mới
+            return VerificationCode::create([
+                'user_id'   => $user->id,
+                'otp'       => rand(100000, 999999),
+                'expire_at' => Carbon::now()->addMinutes(30),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('OTP creation failed', [
+                'error'   => $e->getMessage(),
+                'user_id' => $user->id,
+            ]);
+            throw $e; // Ném lỗi vì đây là lỗi nghiêm trọng
         }
-
-        // nếu không có mã otp hoặc mã otp đó đã hết hiệu lực thì tạo mã otp mới
-        return VerificationCode::create([
-            'user_id'   => $user->id,
-            'otp'       => rand(100000, 999999),
-            'expire_at' => Carbon::now()->addMinutes(30), // thời gian hết hạn = thời gian hiện tại + 3 phút
-        ]);
     }
 
     //kiểm tra mã otp
@@ -348,6 +386,34 @@ class AuthUserController extends Controller
                 'status'  => false,
                 'message' => 'Không thể refresh token',
             ], 401);
+        }
+    }
+
+    /**
+     * Lấy tất cả thông tin mã OTP
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function showVerification()
+    {
+        try {
+            $verificationCodes = VerificationCode::orderBy('created_at', 'desc')->get();
+
+            return response([
+                'status'  => true,
+                'message' => 'Lấy thông tin OTP thành công',
+                'data'    => $verificationCodes,
+            ], 200);
+
+        } catch (\Exception $e) {
+            Log::error('Lỗi khi lấy thông tin OTP', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return response([
+                'status'  => false,
+                'message' => 'Không thể lấy thông tin OTP',
+            ], 500);
         }
     }
 }
