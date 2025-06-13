@@ -64,12 +64,16 @@ class AuthUserController extends Controller
             ]);
         }
 
+        $otp     = $this->generate($user);
         $sendOtp = $this->sendSmsNotification($user);
 
         if ($sendOtp) {
             return response([
                 'status'  => true,
                 'message' => 'OTP đã được gửi thành công',
+                'data'    => [
+                    'otp' => $otp,
+                ],
             ], 200);
         }
 
