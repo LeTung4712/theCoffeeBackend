@@ -81,6 +81,7 @@ class AuthAdminController extends Controller
             $refreshToken,
             self::REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60,
             '/',
+            null,
             true,
             true
         );

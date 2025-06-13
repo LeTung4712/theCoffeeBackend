@@ -33,9 +33,9 @@ use Illuminate\Support\Facades\Route;
  */
 Route::group(['prefix' => 'v1'], function () {
     // Admin routes
-        Route::group(['prefix' => 'admin'], function () {
+    Route::group(['prefix' => 'admin'], function () {
         // Auth routes
-            Route::post('auth/login', [AuthAdminController::class, 'login']);
+        Route::post('auth/login', [AuthAdminController::class, 'login']);
         Route::post('auth/logout', [AuthAdminController::class, 'logout']);
         Route::post('auth/refresh-token', [AuthAdminController::class, 'refreshToken']);
 
@@ -97,11 +97,10 @@ Route::group(['prefix' => 'v1'], function () {
         Route::post('auth/login', [AuthUserController::class, 'login']);
         Route::post('auth/verify-otp', [AuthUserController::class, 'checkOtp']);
         Route::post('auth/refresh-token', [AuthUserController::class, 'refreshToken']);
-        Route::post('auth/logout', [AuthUserController::class, 'logout']);
-        
+
         // Protected routes
         Route::middleware('auth.user')->group(function () {
-            
+            Route::post('auth/logout', [AuthUserController::class, 'logout']);
 
             // User profile
             Route::get('me', [UserController::class, 'getProfile']);

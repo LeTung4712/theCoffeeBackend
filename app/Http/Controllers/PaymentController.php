@@ -4,10 +4,8 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Payment;
-use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Validator;
 
 class PaymentController extends Controller
@@ -76,7 +74,7 @@ class PaymentController extends Controller
             'order_code' => 'required|string|exists:orders,order_code',
             'return_url' => 'required|url',
         ]);
-
+        \Log::info('MOMO payment request', $request->all());
         if ($validator->fails()) {
             return response()->json([
                 'status'  => false,
@@ -134,7 +132,7 @@ class PaymentController extends Controller
                 'orderId'     => $uniqueTransactionId,
                 'orderInfo'   => "Thanh toán đơn hàng " . $order->order_code,
                 'redirectUrl' => $request->return_url,
-                'ipnUrl'      => env('APP_URL') . '/api/v1/payments/momo/callback',
+                'ipnUrl'      => 'https://coffee-shop.click/api/v1/payments/momo/callback',
                 'lang'        => 'vi',
                 'extraData'   => $payment->id,
                 'requestType' => "captureWallet",
@@ -205,6 +203,7 @@ class PaymentController extends Controller
      */
     public function momo_callback(Request $request)
     {
+        \Log::info('MOMO callback request', $request->all());
         try {
             DB::beginTransaction();
 
@@ -233,7 +232,7 @@ class PaymentController extends Controller
 
             // Cập nhật payment record
             $payment->update([
-                'status'                   => ($resultCode == '0') ? 'completed' : 'failed',
+                'status'                   => ($resultCode == '0') ? '1' : '2',
                 'transaction_id'           => $request->transId,
                 'payment_gateway_response' => json_encode($request->all()),
             ]);
@@ -244,7 +243,7 @@ class PaymentController extends Controller
             }
 
             DB::commit();
-            return redirect()->away(env('FRONTEND_URL') . '/payment/result?status=' .
+            return redirect()->away('https://coffee-shop.click/payment/result?status=' .
                 (($resultCode == '0') ? 'success' : 'failure') . '&order_code=' . $order->order_code);
 
         } catch (\Exception $e) {
@@ -254,7 +253,7 @@ class PaymentController extends Controller
                 'error'   => $e->getMessage(),
             ]);
 
-            return redirect()->away(env('FRONTEND_URL') . '/payment/result?status=failure&message=Lỗi xử lý thanh toán');
+            return redirect()->away('https://coffee-shop.click/payment/result?status=failure&message=Lỗi xử lý thanh toán');
         }
     }
 
@@ -517,17 +516,20 @@ class PaymentController extends Controller
             }
 
             // Cấu hình ZaloPay
-            $config = config('services.zalopay');
-
-            $now          = Carbon::now('Asia/Ho_Chi_Minh');
-            $app_trans_id = $now->format('ymd') . '_' . $order->order_code . '_' . round(microtime(true) * 1000);
+            $config = [
+                "app_id"   => 2553,
+                "key1"     => "PcY4iZIKFCIdgZvA6ueMcMHHUbRLYjPL",
+                "key2"     => "kLtgPl8HHhfvMuDHPwKfgfsY4Ydm9eIz",
+                "endpoint" => "https://sb-openapi.zalopay.vn/v2/create",
+            ];
 
             // Tạo payment record
             $payment                 = $this->createPayment($order, $order->final_price, 'zalopay');
-            $payment->transaction_id = $app_trans_id;
+            $payment->transaction_id = date("ymd") . "_" . $order->order_code;
             $payment->save();
 
-            $embed_data = json_encode([
+            // Chuẩn bị dữ liệu gửi đi
+            $embeddata = json_encode([
                 'merchantinfo' => 'embeddata123',
                 'redirecturl'  => $request->return_url,
             ]);
@@ -539,37 +541,55 @@ class PaymentController extends Controller
             ]]);
 
             $order_data = [
-                'app_id'       => $config['app_id'],
-                'app_trans_id' => $app_trans_id,
-                'app_user'     => 'user_' . $user->id,
-                'app_time'     => round(microtime(true) * 1000),
-                'amount'       => (int) $order->final_price,
-                'item'         => $items,
-                'description'  => 'Thanh toan don hang ' . $order->order_code,
-                'embed_data'   => $embed_data,
-                'bank_code'    => 'zalopayapp',
-                'callback_url' => env('APP_URL') . '/api/v1/payments/zalopay/callback',
+                "app_id"       => $config["app_id"],
+                "app_time"     => round(microtime(true) * 1000),
+                "app_trans_id" => $payment->transaction_id,
+                "app_user"     => "user_" . $user->id,
+                "item"         => $items,
+                "embed_data"   => $embeddata,
+                "amount"       => (int) $order->final_price,
+                "description"  => "Thanh toan don hang " . $order->order_code,
+                "bank_code"    => "zalopayapp",
+                "callback_url" => 'https://coffee-shop.click/api/v1/payments/zalopay/callback',
             ];
 
-            $data = $order_data['app_id'] . '|' .
-                $order_data['app_trans_id'] . '|' .
-                $order_data['app_user'] . '|' .
-                $order_data['amount'] . '|' .
-                $order_data['app_time'] . '|' .
-                $order_data['embed_data'] . '|' .
-                $order_data['item'];
+            // Tạo chuỗi data để tính MAC
+            $data = $order_data["app_id"] . "|" .
+                $order_data["app_trans_id"] . "|" .
+                $order_data["app_user"] . "|" .
+                $order_data["amount"] . "|" .
+                $order_data["app_time"] . "|" .
+                $order_data["embed_data"] . "|" .
+                $order_data["item"];
 
-            $order_data['mac'] = hash_hmac('sha256', $data, $config['key1']);
+            $order_data["mac"] = hash_hmac("sha256", $data, $config["key1"]);
+
+            // Log dữ liệu gửi đi để debug
+            \Log::info('ZaloPay request data', [
+                'order_data' => $order_data,
+                'mac_data'   => $data,
+            ]);
 
             // Gọi API ZaloPay
-            $response = Http::asForm()
-                ->post($config['endpoint'], $order_data);
+            $context = stream_context_create([
+                "http" => [
+                    "header"  => "Content-type: application/x-www-form-urlencoded\r\n",
+                    "method"  => "POST",
+                    "content" => http_build_query($order_data),
+                ],
+            ]);
 
-            $jsonResult = $response->json();
+            $resp   = file_get_contents($config["endpoint"], false, $context);
+            $result = json_decode($resp, true);
 
-            if ($jsonResult['return_code'] == 1) {
+            // Log response để debug
+            \Log::info('ZaloPay response', [
+                'response' => $result,
+            ]);
+
+            if ($result['return_code'] == 1) {
                 $payment->update([
-                    'payment_gateway_response' => json_encode($jsonResult),
+                    'payment_gateway_response' => json_encode($result),
                 ]);
 
                 DB::commit();
@@ -577,27 +597,27 @@ class PaymentController extends Controller
                     'status'  => true,
                     'message' => 'Gửi yêu cầu thanh toán thành công',
                     'data'    => [
-                        'payUrl'      => $jsonResult['order_url'],
-                        'order_token' => $jsonResult['order_token'],
+                        'payUrl'      => $result['order_url'],
+                        'order_token' => $result['order_token'],
                     ],
                 ], 200);
             }
 
             $payment->update([
                 'status'                   => '0',
-                'payment_gateway_response' => json_encode($jsonResult),
+                'payment_gateway_response' => json_encode($result),
             ]);
 
             DB::commit();
             \Log::error('ZaloPay payment failed', [
                 'order_code' => $request->order_code,
-                'error'      => $jsonResult['return_message'] ?? 'Không thể tạo đơn hàng ZaloPay',
-                'details'    => $jsonResult,
+                'error'      => $result['return_message'] ?? 'Không thể tạo đơn hàng ZaloPay',
+                'details'    => $result,
             ]);
             return response()->json([
                 'status'  => false,
-                'message' => $jsonResult['return_message'] ?? 'Không thể tạo đơn hàng ZaloPay',
-                'details' => $jsonResult,
+                'message' => $result['return_message'] ?? 'Không thể tạo đơn hàng ZaloPay',
+                'details' => $result,
             ], 400);
 
         } catch (\Exception $e) {

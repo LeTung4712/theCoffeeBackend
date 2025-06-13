@@ -206,7 +206,7 @@ class OrderController extends Controller
             DB::commit();
 
             // Gửi event realtime thông báo đơn hàng mới
-            //event(new NewOrderEvent($order));
+            event(new NewOrderEvent($order));
 
             return response()->json([
                 'status'  => true,
@@ -234,7 +234,7 @@ class OrderController extends Controller
             return response()->json(['message' => 'Không tìm thấy đơn hàng'], 404);
         }
         try {
-            $order->payment_status = '1'; // Chỉ cập nhật trạng thái thanh toán
+            $order->payment_status = '22'; // Chỉ cập nhật trạng thái thanh toán
             $order->save();
             return response()->json(['message' => 'Cập nhật trạng thái thanh toán thành công'], 200);
         } catch (\Exception $e) {
