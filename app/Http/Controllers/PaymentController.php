@@ -40,28 +40,10 @@ class PaymentController extends Controller
             'order_code'               => $order->order_code,
             'amount'                   => $amount,
             'payment_method'           => $paymentMethod,
-            'status'                   => $status,
+            'status'                   => $status, // 0: pending, 1: completed, 2: failed, 3: cancelled
             'transaction_id'           => $transactionId,
             'payment_gateway_response' => $gatewayResponse ? json_encode($gatewayResponse) : null,
         ]);
-    }
-
-    /**
-     * Cập nhật trạng thái thanh toán của đơn hàng
-     */
-    private function updateOrderPaymentStatus($order)
-    {
-        $totalPaid = $order->getTotalPaidAmount();
-
-        if ($totalPaid >= $order->final_price) {
-            $order->payment_status = '1'; // Đã thanh toán đủ
-        } else {
-            $order->payment_status = '0'; // Chưa thanh toán
-        }
-
-        $order->save();
-
-        return $order;
     }
 
     //=============================================== MOMO ================================================
@@ -157,7 +139,7 @@ class PaymentController extends Controller
                 ]);
 
                 $payment->update([
-                    'status'                   => 'failed',
+                    'status'                   => '2', // failed
                     'payment_gateway_response' => json_encode($jsonResult),
                 ]);
 
@@ -172,8 +154,16 @@ class PaymentController extends Controller
             // Cập nhật payment record
             $payment->update([
                 'transaction_id'           => $jsonResult['orderId'],
+                'status'                   => '1', // completed
                 'payment_gateway_response' => json_encode($jsonResult),
             ]);
+
+            // Cập nhật trạng thái đơn hàng nếu thanh toán thành công
+            if ($jsonResult['resultCode'] == '0') {
+                $order->update([
+                    'payment_status' => '1', // 1 = đã thanh toán
+                ]);
+            }
 
             DB::commit();
             return response()->json([
@@ -232,28 +222,25 @@ class PaymentController extends Controller
 
             // Cập nhật payment record
             $payment->update([
-                'status'                   => ($resultCode == '0') ? '1' : '2',
+                'status'                   => ($resultCode == '0') ? '1' : '2', // 1: completed, 2: failed
                 'transaction_id'           => $request->transId,
                 'payment_gateway_response' => json_encode($request->all()),
             ]);
 
             // Cập nhật trạng thái đơn hàng nếu thanh toán thành công
             if ($resultCode == '0') {
-                $this->updateOrderPaymentStatus($order);
+                $order->update([
+                    'payment_status' => '1', // 1 = đã thanh toán
+                ]);
             }
 
             DB::commit();
-            return redirect()->away('https://coffee-shop.click/payment/result?status=' .
-                (($resultCode == '0') ? 'success' : 'failure') . '&order_code=' . $order->order_code);
-
         } catch (\Exception $e) {
             DB::rollBack();
             \Log::error('MOMO callback exception', [
                 'request' => $request->all(),
                 'error'   => $e->getMessage(),
             ]);
-
-            return redirect()->away('https://coffee-shop.click/payment/result?status=failure&message=Lỗi xử lý thanh toán');
         }
     }
 
@@ -438,11 +425,14 @@ class PaymentController extends Controller
             if ($inputData['vnp_ResponseCode'] == '00') {
                 // Thanh toán thành công
                 $payment->update([
-                    'status'                   => 'completed',
+                    'status'                   => '1', // completed
                     'payment_gateway_response' => json_encode($inputData),
                 ]);
 
-                $this->updateOrderPaymentStatus($order);
+                $order->update([
+                    'payment_status' => '1', // 1 = đã thanh toán
+                ]);
+
                 DB::commit();
 
                 return redirect()->away(env('FRONTEND_URL') . '/payment/result?status=success&order_code=' . $orderCode);
@@ -450,7 +440,7 @@ class PaymentController extends Controller
 
             // Thanh toán thất bại
             $payment->update([
-                'status'                   => 'failed',
+                'status'                   => '2', // failed
                 'payment_gateway_response' => json_encode($inputData),
             ]);
 
@@ -589,7 +579,12 @@ class PaymentController extends Controller
 
             if ($result['return_code'] == 1) {
                 $payment->update([
+                    'status'                   => '1', // completed
                     'payment_gateway_response' => json_encode($result),
+                ]);
+
+                $order->update([
+                    'payment_status' => '1', // 1 = đã thanh toán
                 ]);
 
                 DB::commit();
@@ -604,7 +599,7 @@ class PaymentController extends Controller
             }
 
             $payment->update([
-                'status'                   => '0',
+                'status'                   => '2', // failed
                 'payment_gateway_response' => json_encode($result),
             ]);
 
@@ -686,11 +681,14 @@ class PaymentController extends Controller
 
             if ($data['status'] == 1) {
                 $payment->update([
-                    'status'                   => 'completed',
+                    'status'                   => '1', // completed
                     'payment_gateway_response' => json_encode($data),
                 ]);
 
-                $this->updateOrderPaymentStatus($order);
+                $order->update([
+                    'payment_status' => '1', // 1 = đã thanh toán
+                ]);
+
                 DB::commit();
 
                 return response()->json([
@@ -700,7 +698,7 @@ class PaymentController extends Controller
             }
 
             $payment->update([
-                'status'                   => 'failed',
+                'status'                   => '2', // failed
                 'payment_gateway_response' => json_encode($data),
             ]);
 

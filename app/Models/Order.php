@@ -55,4 +55,11 @@ class Order extends Model
         return $this->payment_status == '1';
     }
 
+    public function getTotalPaidAmount()
+    {
+        return $this->payments()
+            ->where('status', '1')   // 1 = thành công
+            ->first()?->amount ?? 0; // Lấy payment thành công đầu tiên
+    }
+
 }
