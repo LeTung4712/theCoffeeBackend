@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\Topping;
 use App\Models\Voucher;
 use App\Models\VoucherUsage;
+use App\Events\NewOrderEvent;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
