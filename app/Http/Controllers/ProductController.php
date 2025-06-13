@@ -314,17 +314,31 @@ class ProductController extends Controller
         }
 
         try {
+            // Xóa các bản ghi liên quan trong ToppingProduct
+            ToppingProduct::where('product_id', $product->id)->delete();
+
+            // Thử xóa sản phẩm
             $product->delete();
+
             return response()->json([
                 'status'  => true,
                 'message' => 'Xóa sản phẩm thành công',
             ], 200);
         } catch (\Exception $e) {
-            return response()->json([
-                'status'  => false,
-                'message' => 'Xóa sản phẩm thất bại',
-                'error'   => $e->getMessage(),
-            ], 400);
+            // Nếu xóa không thành công, đánh dấu sản phẩm là không hoạt động
+            try {
+                $product->update(['active' => false]);
+                return response()->json([
+                    'status'  => true,
+                    'message' => 'Xóa sản phẩm không thành công, đã đánh dấu sản phẩm là không hoạt động',
+                ], 200);
+            } catch (\Exception $updateException) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'Xóa sản phẩm thất bại và không thể đánh dấu sản phẩm là không hoạt động',
+                    'error'   => $updateException->getMessage(),
+                ], 400);
+            }
         }
     }
 }
