@@ -261,13 +261,27 @@ class AuthUserController extends Controller
     public function logout(Request $request)
     {
         try {
-            // Lấy user từ request đã được merge bởi middleware
-            $user = $request->user;
+            // Lấy refresh token từ cookie
+            $refreshToken = $request->cookie('refresh_token');
+            if (! $refreshToken) {
+                return response([
+                    'status'  => false,
+                    'message' => 'Refresh token không tồn tại',
+                ], 401);
+            }
+
+            // Tìm user có refresh token tương ứng
+            $user = User::where('refresh_token_expired_at', '>', Carbon::now())
+                ->whereNotNull('refresh_token')
+                ->get()
+                ->first(function ($user) use ($refreshToken) {
+                    return Hash::check($refreshToken, $user->refresh_token);
+                });
 
             if (! $user) {
-                return response()->json([
+                return response([
                     'status'  => false,
-                    'message' => 'Không tìm thấy thông tin người dùng',
+                    'message' => 'Refresh token không hợp lệ hoặc đã hết hạn',
                 ], 401);
             }
 

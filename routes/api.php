@@ -97,10 +97,10 @@ Route::group(['prefix' => 'v1'], function () {
         Route::post('auth/login', [AuthUserController::class, 'login']);
         Route::post('auth/verify-otp', [AuthUserController::class, 'checkOtp']);
         Route::post('auth/refresh-token', [AuthUserController::class, 'refreshToken']);
+        Route::post('auth/logout', [AuthUserController::class, 'logout']);
 
         // Protected routes
         Route::middleware('auth.user')->group(function () {
-            Route::post('auth/logout', [AuthUserController::class, 'logout']);
 
             // User profile
             Route::get('me', [UserController::class, 'getProfile']);

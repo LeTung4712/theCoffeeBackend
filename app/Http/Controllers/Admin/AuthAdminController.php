@@ -191,10 +191,27 @@ class AuthAdminController extends Controller
         }
     }
 
-    public function logout()
+    public function logout(Request $request)
     {
         try {
-            $admin = auth('admin')->user();
+            $refreshToken = $request->cookie('admin_refresh_token');
+            if (! $refreshToken) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'Refresh token không tồn tại',
+                ], 401);
+            }
+
+            // Lấy tài khoản admin duy nhất
+            $admin = Admin::first();
+
+            if (! $admin || ! $admin->refresh_token || ! Hash::check($refreshToken, $admin->refresh_token)) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'Refresh token không hợp lệ',
+                ], 401);
+            }
+            
             if ($admin) {
                 $admin->update([
                     'access_token'             => null,
