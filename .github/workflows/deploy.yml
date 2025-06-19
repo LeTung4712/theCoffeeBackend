@@ -1,4 +1,4 @@
-name: Laravel CI/CD
+name: Deploy Laravel to multiple VPS
 
 on:
   push:
@@ -9,24 +9,42 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-      - name: Deploy to VPS
+      # Deploy to Server 1
+      - name: Deploy to Server 1 (Me)
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_KEY }}
+          host: ${{ secrets.VPS1_HOST }}
+          username: ${{ secrets.VPS1_USER }}
+          key: ${{ secrets.VPS1_KEY }}
           script: |
-            cd /var/www/deploy-thecoffeeshop/theCoffeeBackend
+            cd /var/www/thecoffeeshop-be
             git pull origin main
             composer install --no-interaction --prefer-dist --optimize-autoloader
-            php artisan config:clear
-            php artisan cache:clear
+            php artisan migrate --force
             php artisan config:cache
             php artisan route:cache
             php artisan view:cache
+            sudo chown -R letung:www-data .
+            sudo chmod -R 775 storage bootstrap/cache
 
-            find storage bootstrap/cache -type f -exec chmod 664 {} \;
-            find storage bootstrap/cache -type d -exec chmod 775 {} \;
+      # Deploy to Server 2
+      - name: Deploy to Server 2 (School)
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS2_HOST }}
+          username: ${{ secrets.VPS2_USER }}
+          key: ${{ secrets.VPS2_KEY }}
+          script: |
+            cd /var/www/thecoffeeshop-be
+            git pull origin main
+            composer install --no-interaction --prefer-dist --optimize-autoloader
+            php artisan migrate --force
+            php artisan config:cache
+            php artisan route:cache
+            php artisan view:cache
+            sudo chown -R letung:www-data .
+            sudo chmod -R 775 storage bootstrap/cache
 
