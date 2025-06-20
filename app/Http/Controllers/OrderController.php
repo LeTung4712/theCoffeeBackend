@@ -320,6 +320,7 @@ class OrderController extends Controller
             DB::beginTransaction();
 
             $order->status = '2'; // Giao hàng thành công
+            $order->payment_status = '1'; // Đã thanh toán
             $order->save();
 
             DB::commit();
