@@ -146,7 +146,7 @@ class PaymentController extends Controller
                 DB::commit();
                 return response()->json([
                     'status'  => false,
-                    'message' => 'Không thể tạo yêu cầu thanh toán',
+                    'message' => 'Không thể tạo yêu cầu thanh toán Momo',
                     'details' => $jsonResult,
                 ], 400);
             }
@@ -169,7 +169,7 @@ class PaymentController extends Controller
 
             return response()->json([
                 'status'  => false,
-                'message' => 'Có lỗi xảy ra khi xử lý thanh toán',
+                'message' => 'Có lỗi xảy ra khi xử lý thanh toán Momo',
             ], 500);
         }
     }
@@ -179,54 +179,86 @@ class PaymentController extends Controller
      */
     public function momo_callback(Request $request)
     {
-        \Log::info('MOMO callback request', $request->all());
+        \Log::info('MOMO callback received', $request->all());
+
+        $secretKey     = config('services.momo.secret_key');
+        $momoSignature = $request->signature;
+
+        // The raw hash string for signature verification. DO NOT CHANGE THE ORDER.
+        // The order of fields is specified by Momo's documentation for IPN.
+        $rawHash = "accessKey=" . $request->accessKey .
+        "&amount=" . $request->amount .
+        "&extraData=" . $request->extraData .
+        "&message=" . $request->message .
+        "&orderId=" . $request->orderId .
+        "&orderInfo=" . $request->orderInfo .
+        "&orderType=" . $request->orderType .
+        "&partnerCode=" . $request->partnerCode .
+        "&payType=" . $request->payType .
+        "&requestId=" . $request->requestId .
+        "&responseTime=" . $request->responseTime .
+        "&resultCode=" . $request->resultCode .
+        "&transId=" . $request->transId;
+
+        $signature = hash_hmac("sha256", $rawHash, $secretKey);
+
+        if ($signature !== $momoSignature) {
+            \Log::error('MOMO callback: Invalid signature', ['request' => $request->all()]);
+            // Just log and stop processing. Do not return error response to prevent retry storms.
+            return;
+        }
+
+        DB::beginTransaction();
         try {
-            DB::beginTransaction();
+            $paymentId = $request->extraData;
+            $payment   = Payment::find($paymentId);
 
-            $resultCode = $request->resultCode;
-            $orderId    = $request->orderId;
-            $paymentId  = $request->extraData;
-
-            // Tìm payment record
-            $payment = Payment::find($paymentId);
             if (! $payment) {
                 \Log::error('MOMO callback: Payment not found', ['payment_id' => $paymentId]);
-                return response()->json([
-                    'status'  => false,
-                    'message' => 'Không tìm thấy giao dịch thanh toán',
-                ], 404);
+                DB::rollBack();
+                return; // Stop processing
+            }
+
+            // Idempotency Check: if already completed, do nothing.
+            if ($payment->status === '1') {
+                \Log::info('MOMO callback: Payment already completed.', ['payment_id' => $paymentId]);
+                DB::commit(); // Commit to release lock
+                return response()->json(['code' => 0, 'message' => 'OK']);
             }
 
             $order = $payment->order;
             if (! $order) {
-                \Log::error('MOMO callback: Order not found', ['payment_id' => $paymentId]);
-                return response()->json([
-                    'status'  => false,
-                    'message' => 'Không tìm thấy đơn hàng',
-                ], 404);
+                \Log::error('MOMO callback: Order not found for payment', ['payment_id' => $paymentId]);
+                DB::rollBack();
+                return; // Stop processing
             }
 
-            // Cập nhật payment record
+            $resultCode = $request->resultCode;
+
+            // Update payment record
             $payment->update([
                 'status'                   => ($resultCode == '0') ? '1' : '2', // 1: completed, 2: failed
                 'transaction_id'           => $request->transId,
                 'payment_gateway_response' => json_encode($request->all()),
             ]);
 
-            // Cập nhật trạng thái đơn hàng nếu thanh toán thành công
+            // Update order status if payment was successful
             if ($resultCode == '0') {
-                $order->update([
-                    'payment_status' => '1', // 1 = đã thanh toán
-                ]);
+                $order->update(['payment_status' => '1']); // 1 = đã thanh toán
             }
 
             DB::commit();
+
+            // Respond to Momo to acknowledge receipt
+            return response()->json(['code' => 0, 'message' => 'OK']);
+
         } catch (\Exception $e) {
             DB::rollBack();
             \Log::error('MOMO callback exception', [
                 'request' => $request->all(),
                 'error'   => $e->getMessage(),
             ]);
+            // Just log the error. Do not return a 500 error to Momo, as it might retry.
         }
     }
 
@@ -347,7 +379,7 @@ class PaymentController extends Controller
 
             return response()->json([
                 'status'  => false,
-                'message' => 'Có lỗi xảy ra khi xử lý thanh toán',
+                'message' => 'Có lỗi xảy ra khi xử lý thanh toán VNPay',
             ], 500);
         }
     }
@@ -564,6 +596,7 @@ class PaymentController extends Controller
             ]);
 
             if ($result['return_code'] == 1) {
+                // Chỉ cập nhật response, không cập nhật status. Status vẫn là 'pending'
                 $payment->update([
                     'payment_gateway_response' => json_encode($result),
                 ]);
@@ -579,7 +612,13 @@ class PaymentController extends Controller
                 ], 200);
             }
 
-            
+            // Nếu việc tạo yêu cầu thanh toán thất bại
+            $payment->update([
+                'status'                   => '2', // failed
+                'payment_gateway_response' => json_encode($result),
+            ]);
+
+            DB::commit();
             \Log::error('ZaloPay payment failed', [
                 'order_code' => $request->order_code,
                 'error'      => $result['return_message'] ?? 'Không thể tạo đơn hàng ZaloPay',
@@ -600,7 +639,7 @@ class PaymentController extends Controller
 
             return response()->json([
                 'status'  => false,
-                'message' => 'Có lỗi xảy ra khi xử lý thanh toán',
+                'message' => 'Có lỗi xảy ra khi xử lý thanh toán ZaloPay',
             ], 500);
         }
     }
@@ -610,43 +649,65 @@ class PaymentController extends Controller
      */
     public function zalopay_callback(Request $request)
     {
+        \Log::info('ZaloPay callback received', ['content' => $request->getContent()]);
+
+        $result = [];
         try {
+            // ZaloPay sends a JSON payload, not form-data.
+            $key2         = config('services.zalopay.key2');
+            $callbackData = json_decode($request->getContent(), true);
+            $mac          = $callbackData['mac'];
+            $data         = $callbackData['data'];
+
+            $mac_verify = hash_hmac('sha256', $data, $key2);
+
+            // 1. Signature Verification
+            if ($mac_verify !== $mac) {
+                \Log::error('ZaloPay callback: Invalid signature.');
+                $result['return_code']    = -1;
+                $result['return_message'] = 'Invalid signature';
+                return response()->json($result);
+            }
+
             DB::beginTransaction();
 
-            $key2 = config('services.zalopay.key2');
-            $data = $request->all();
-            $mac  = $data['mac'];
-            unset($data['mac']);
+            $data_result  = json_decode($data, true);
+            $app_trans_id = $data_result['app_trans_id'];
 
-            // Tạo chuỗi hash để verify
-            $dataStr = '';
-            foreach ($data as $key => $value) {
-                $dataStr .= $key . '=' . $value . '&';
-            }
-            $dataStr   = rtrim($dataStr, '&');
-            $macVerify = hash_hmac('sha256', $dataStr, $key2);
+            // 2. Find Payment by transaction_id
+            $payment = Payment::where('transaction_id', $app_trans_id)->first();
 
-            if ($mac !== $macVerify) {
-                \Log::error('ZaloPay callback: Invalid signature', ['data' => $data]);
-            }
-
-            // Tìm đơn hàng và payment
-            $orderCode = explode('_', $data['app_trans_id'])[1];
-            $order     = Order::where('order_code', $orderCode)->first();
-
-            if (! $order) {
-                \Log::error('ZaloPay callback: Order not found', ['order_code' => $orderCode]);
-            }
-
-            $payment = Payment::where('transaction_id', $data['app_trans_id'])->first();
             if (! $payment) {
-                \Log::error('ZaloPay callback: Payment not found', ['transaction_id' => $data['app_trans_id']]);
+                \Log::error('ZaloPay callback: Payment not found', ['transaction_id' => $app_trans_id]);
+                DB::rollBack();
+                $result['return_code']    = -1;
+                $result['return_message'] = 'Payment not found';
+                return response()->json($result);
             }
 
-            if ($data['status'] == 1) {
+            // 3. Idempotency Check
+            if ($payment->status === '1') {
+                \Log::info('ZaloPay callback: Payment already completed.', ['payment_id' => $payment->id]);
+                DB::commit();
+                $result['return_code']    = 1;
+                $result['return_message'] = 'Success';
+                return response()->json($result);
+            }
+
+            $order = $payment->order;
+            if (! $order) {
+                \Log::error('ZaloPay callback: Order not found for payment', ['payment_id' => $payment->id]);
+                DB::rollBack();
+                $result['return_code']    = -1;
+                $result['return_message'] = 'Order not found';
+                return response()->json($result);
+            }
+
+                                               // 4. Update Status
+            if ($data_result['status'] == 1) { // Payment successful
                 $payment->update([
-                    'status'                   => '1', // completed
-                    'payment_gateway_response' => json_encode($data),
+                    'status'                   => '1',                    // completed
+                    'payment_gateway_response' => $request->getContent(), // Store raw callback JSON
                 ]);
 
                 $order->update([
@@ -654,23 +715,33 @@ class PaymentController extends Controller
                 ]);
 
                 DB::commit();
-
+                $result['return_code']    = 1;
+                $result['return_message'] = 'Success';
+            } else {
+                // Payment failed
+                $payment->update([
+                    'status'                   => '2', // failed
+                    'payment_gateway_response' => $request->getContent(),
+                ]);
+                DB::commit();
+                // Even if it fails, we acknowledge the callback.
+                $result['return_code']    = 1;
+                $result['return_message'] = 'Success';
             }
 
-            $payment->update([
-                'status'                   => '2', // failed
-                'payment_gateway_response' => json_encode($data),
-            ]);
-
-            DB::commit();
-
+            return response()->json($result);
 
         } catch (\Exception $e) {
-            DB::rollBack();
+            if (DB::transactionLevel() > 0) {
+                DB::rollBack();
+            }
             \Log::error('ZaloPay callback exception', [
-                'request' => $request->all(),
+                'request' => $request->getContent(),
                 'error'   => $e->getMessage(),
             ]);
+            $result['return_code']    = -1;
+            $result['return_message'] = 'Exception';
+            return response()->json($result);
         }
     }
 }
