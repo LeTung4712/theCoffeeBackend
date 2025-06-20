@@ -245,6 +245,8 @@ class PaymentController extends Controller
             // Update order status if payment was successful
             if ($resultCode == '0') {
                 $order->update(['payment_status' => '1']); // 1 = đã thanh toán
+            } else {
+                $order->update(['payment_status' => '0']); // 0 = chưa thanh toán
             }
 
             DB::commit();
