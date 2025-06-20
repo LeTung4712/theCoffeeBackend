@@ -151,20 +151,6 @@ class PaymentController extends Controller
                 ], 400);
             }
 
-            // Cập nhật payment record
-            $payment->update([
-                'transaction_id'           => $jsonResult['orderId'],
-                'status'                   => '1', // completed
-                'payment_gateway_response' => json_encode($jsonResult),
-            ]);
-
-            // Cập nhật trạng thái đơn hàng nếu thanh toán thành công
-            if ($jsonResult['resultCode'] == '0') {
-                $order->update([
-                    'payment_status' => '1', // 1 = đã thanh toán
-                ]);
-            }
-
             DB::commit();
             return response()->json([
                 'status'  => true,
@@ -579,12 +565,7 @@ class PaymentController extends Controller
 
             if ($result['return_code'] == 1) {
                 $payment->update([
-                    'status'                   => '1', // completed
                     'payment_gateway_response' => json_encode($result),
-                ]);
-
-                $order->update([
-                    'payment_status' => '1', // 1 = đã thanh toán
                 ]);
 
                 DB::commit();
@@ -598,12 +579,7 @@ class PaymentController extends Controller
                 ], 200);
             }
 
-            $payment->update([
-                'status'                   => '2', // failed
-                'payment_gateway_response' => json_encode($result),
-            ]);
-
-            DB::commit();
+            
             \Log::error('ZaloPay payment failed', [
                 'order_code' => $request->order_code,
                 'error'      => $result['return_message'] ?? 'Không thể tạo đơn hàng ZaloPay',
@@ -652,10 +628,6 @@ class PaymentController extends Controller
 
             if ($mac !== $macVerify) {
                 \Log::error('ZaloPay callback: Invalid signature', ['data' => $data]);
-                return response()->json([
-                    'return_code'    => -1,
-                    'return_message' => 'Chữ ký không hợp lệ',
-                ]);
             }
 
             // Tìm đơn hàng và payment
@@ -664,19 +636,11 @@ class PaymentController extends Controller
 
             if (! $order) {
                 \Log::error('ZaloPay callback: Order not found', ['order_code' => $orderCode]);
-                return response()->json([
-                    'return_code'    => -1,
-                    'return_message' => 'Không tìm thấy đơn hàng',
-                ]);
             }
 
             $payment = Payment::where('transaction_id', $data['app_trans_id'])->first();
             if (! $payment) {
                 \Log::error('ZaloPay callback: Payment not found', ['transaction_id' => $data['app_trans_id']]);
-                return response()->json([
-                    'return_code'    => -1,
-                    'return_message' => 'Không tìm thấy giao dịch thanh toán',
-                ]);
             }
 
             if ($data['status'] == 1) {
@@ -691,10 +655,6 @@ class PaymentController extends Controller
 
                 DB::commit();
 
-                return response()->json([
-                    'return_code'    => 1,
-                    'return_message' => 'success',
-                ]);
             }
 
             $payment->update([
@@ -703,10 +663,7 @@ class PaymentController extends Controller
             ]);
 
             DB::commit();
-            return response()->json([
-                'return_code'    => -1,
-                'return_message' => 'Thanh toán thất bại',
-            ]);
+
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -714,38 +671,6 @@ class PaymentController extends Controller
                 'request' => $request->all(),
                 'error'   => $e->getMessage(),
             ]);
-
-            return response()->json([
-                'return_code'    => -1,
-                'return_message' => 'Lỗi xử lý thanh toán',
-            ]);
         }
     }
-
-    /**
-     * Kiểm tra trạng thái đơn hàng ZaloPay
-     */
-    public function zalopay_check_status(Request $request)
-    {
-        $app_id   = config('services.zalopay.app_id');
-        $key1     = config('services.zalopay.key1');
-        $endpoint = "https://sandbox.zalopay.com.vn/v001/tpe/getstatusbyapptransid";
-
-        $data = [
-            'app_id'       => $app_id,
-            'app_trans_id' => $request->app_trans_id,
-            'mac'          => hash_hmac('sha256', $app_id . '|' . $request->app_trans_id, $key1),
-        ];
-
-        try {
-            $result = $this->execPostRequest($endpoint, json_encode($data));
-            return response()->json(json_decode($result, true));
-        } catch (\Exception $e) {
-            return response()->json([
-                'return_code'    => -1,
-                'return_message' => $e->getMessage(),
-            ], 500);
-        }
-    }
-
 }
