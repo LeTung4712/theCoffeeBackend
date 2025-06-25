@@ -236,8 +236,8 @@ class RecommendationController extends Controller
         // Sắp xếp theo điểm số giảm dần
         arsort($scored_recommendations);
 
-        // Lấy tối đa 6 sản phẩm được đề xuất
-        $recommendedIds = array_slice(array_keys($scored_recommendations), 0, 6);
+        // Lấy tối đa 4 sản phẩm được đề xuất
+        $recommendedIds = array_slice(array_keys($scored_recommendations), 0, 4);
 
         // Lấy thông tin sản phẩm trong một query để tránh N+1
         $recommended_products = Product::whereIn('id', $recommendedIds)
@@ -247,6 +247,18 @@ class RecommendationController extends Controller
             })
             ->values();
 
+        // Nếu số lượng < 4 thì lấy thêm sản phẩm phổ biến cho đủ
+        if ($recommended_products->count() < 4) {
+            $popularProducts = Product::whereIn('id', [3, 20, 24, 28])
+                ->whereNotIn('id', $recommendedIds)
+                ->take(4 - $recommended_products->count())
+                ->get();
+
+            // Gộp lại và đảm bảo không trùng lặp
+            $recommended_products = $recommended_products->concat($popularProducts)->unique('id')->values();
+        }
+
+        // Nếu vẫn không có sản phẩm nào thì trả về sản phẩm phổ biến
         if ($recommended_products->isEmpty()) {
             return $this->getPopularProducts();
         }
@@ -255,7 +267,7 @@ class RecommendationController extends Controller
             'status'  => true,
             'message' => 'Lấy danh sách sản phẩm đề xuất thành công',
             'data'    => [
-                'recommend_id'       => $recommendedIds,
+                'recommend_id'       => $recommended_products->pluck('id'),
                 'recommend_products' => $recommended_products,
             ],
         ], 200);
