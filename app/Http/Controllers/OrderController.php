@@ -207,7 +207,7 @@ class OrderController extends Controller
             DB::commit();
 
             // Gửi event realtime thông báo đơn hàng mới
-            event(new NewOrderEvent($order));
+            //event(new NewOrderEvent($order));
 
             return response()->json([
                 'status'  => true,

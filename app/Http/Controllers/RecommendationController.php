@@ -25,7 +25,29 @@ class RecommendationController extends Controller
         $endDate       = $request->input('endDate');
 
         // Lấy transactions từ TransactionData
-        $transactions = TransactionData::getTransactions();
+        switch ($timeRange) {
+            case 'week':
+                $transactions = TransactionData::getTransactionsByWeek();
+                break;
+            case 'month':
+                $transactions = TransactionData::getTransactionsByMonth();
+                break;
+            case 'quarter':
+                $transactions = TransactionData::getTransactionsByQuarter();
+                break;
+            case 'year':
+                $transactions = TransactionData::getTransactionsByYear();
+                break;
+            default:
+                $transactions = TransactionData::getTransactionByWeek();
+                break;
+        }
+
+        if (count($transactions) < 100) {
+            return response()->json([
+                'error' => 'Không đủ dữ liệu giao dịch để phân tích. Vui lòng chọn khoảng thời gian dài hơn hoặc nhập thêm dữ liệu.',
+            ], 400);
+        }
 
         //goi ham removeDuplicates de loai bo cac san pham trung lap trong moi giao dich
         $transactions = array_map([$this, 'removeDuplicates'], $transactions);
@@ -44,6 +66,12 @@ class RecommendationController extends Controller
                 'status'  => false,
                 'message' => 'Thuật toán không hợp lệ',
             ], 400);
+        }
+
+        // Sau khi sinh luật
+        $maxRules = 100;
+        if (count($associationRules) > $maxRules) {
+            $associationRules = array_slice($associationRules, 0, $maxRules);
         }
 
         // Kết thúc đo thời gian và tính thời gian thực thi (đơn vị milliseconds)
