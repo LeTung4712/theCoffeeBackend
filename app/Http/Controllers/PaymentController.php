@@ -186,7 +186,7 @@ class PaymentController extends Controller
 
         // The raw hash string for signature verification. DO NOT CHANGE THE ORDER.
         // The order of fields is specified by Momo's documentation for IPN.
-        $rawHash = "accessKey=" . $request->accessKey .
+        $rawHash = "accessKey=" . config('services.momo.access_key') .
         "&amount=" . $request->amount .
         "&extraData=" . $request->extraData .
         "&message=" . $request->message .
